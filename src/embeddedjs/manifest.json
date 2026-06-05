@@ -5,17 +5,5 @@
 	],
 	"modules": {
 		"*": "./main"
-	},
-	"resources": {
-		"*-alpha": [
-			{
-				"source": "$(MODDABLE)/examples/assets/scalablefonts/FiraMono/FiraMono-Regular",
-				"size": 9,
-				"monochrome": true,
-				"blocks": [
-					"Basic Latin"
-				]
-			}
-		]
 	}
 }

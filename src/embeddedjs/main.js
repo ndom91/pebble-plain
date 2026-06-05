@@ -1,39 +1,15 @@
-import Button from "pebble/button";
 import Message from "pebble/message";
-import Timer from "timer";
 import {} from "piu/MC";
 
 const ROW_COUNT = 4;
 const HEADER_HEIGHT = 28;
 const ROW_HEIGHT = Math.idiv(screen.height - HEADER_HEIGHT, ROW_COUNT);
-const LOADING_LINES = [
-	"================================",
-	"================================",
-	"================================",
-	"================================",
-	"==============......============",
-	"============...........=========",
-	"===========.............========",
-	"=========................=======",
-	"==================.......=======",
-	"====================....========",
-	"====================...=========",
-	"=====================~==========",
-	"===========..........===========",
-	"==========..........============",
-	"========...........=============",
-	"=======..........===============",
-	"================================",
-	"================================",
-	"================================",
-	"================================",
-];
-const LOADING_LINE_HEIGHT = Math.idiv(screen.height, LOADING_LINES.length);
+let suppressBackRelease = false;
 
 const backgroundSkin = new Skin({ fill: "black" });
 const rowSkin = new Skin({ fill: ["black", "white"] });
-const loadingStyle = new Style({
-	font: "FiraMono-Regular-9",
+const splashStyle = new Style({
+	font: "bold 18px Gothic",
 	color: "white",
 	horizontal: "center",
 	vertical: "middle",
@@ -61,39 +37,51 @@ let view = "list";
 let detailThreadId = null;
 let detailLines = [];
 let detailOffset = 0;
-let pendingThreads = null;
-let pendingError = null;
-let canHideLoading = false;
 
-function buildLoadingContents($) {
-	const contents = [];
-
-	for (let index = 0; index < LOADING_LINES.length; index += 1) {
-		contents.push(
-			Label($, {
-				left: 0,
-				right: 0,
-				top: index * LOADING_LINE_HEIGHT,
-				height: LOADING_LINE_HEIGHT,
-				style: loadingStyle,
-				string: LOADING_LINES[index],
-			}),
-		);
+class AppBehavior extends Behavior {
+	onDisplaying(application) {
+		application.focus();
 	}
-
-	return contents;
+	onPressBack() {
+		if (view === "detail") {
+			suppressBackRelease = true;
+			return true;
+		}
+	}
+	onReleaseBack() {
+		if (suppressBackRelease) {
+			suppressBackRelease = false;
+			renderRows();
+			return true;
+		}
+	}
+	onPressDown() {
+		moveSelection(1);
+		return true;
+	}
+	onPressSelect() {
+		requestSelectedThread();
+		return true;
+	}
+	onPressUp() {
+		moveSelection(-1);
+		return true;
+	}
 }
 
 const ThreadsApplication = Application.template(($) => ({
+	Behavior: AppBehavior,
+	active: true,
 	skin: backgroundSkin,
 	contents: [
-		Container($, {
-			anchor: "LOADING",
+		Label($, {
+			anchor: "SPLASH",
 			left: 0,
 			right: 0,
 			top: 0,
 			bottom: 0,
-			contents: buildLoadingContents($),
+			style: splashStyle,
+			string: "Plain",
 		}),
 		Label($, {
 			anchor: "STATUS",
@@ -103,7 +91,6 @@ const ThreadsApplication = Application.template(($) => ({
 			top: 0,
 			height: HEADER_HEIGHT,
 			style: statusStyle,
-			string: "Loading TODO...",
 		}),
 		Container($, {
 			anchor: "ROW0",
@@ -184,19 +171,7 @@ const ThreadsApplication = Application.template(($) => ({
 	],
 }));
 
-new ThreadsApplication(model, { displayListLength: 4096 });
-
-Timer.set(() => {
-	canHideLoading = true;
-	if (pendingError !== null) {
-		renderError(pendingError);
-	} else if (pendingThreads !== null) {
-		threads = pendingThreads;
-		selectedIndex = 0;
-		firstVisibleIndex = 0;
-		renderRows();
-	}
-}, 1000);
+new ThreadsApplication(model, { displayListLength: 2048 });
 
 function shorten(value, max) {
 	if (value === undefined || value === null) {
@@ -230,7 +205,7 @@ function formatThread(thread) {
 }
 
 function renderDetailRows() {
-	model.LOADING.visible = false;
+	model.SPLASH.visible = false;
 	model.STATUS.visible = true;
 
 	for (let i = 0; i < ROW_COUNT; i += 1) {
@@ -294,7 +269,7 @@ function renderRows() {
 	detailThreadId = null;
 	detailLines = [];
 	detailOffset = 0;
-	model.LOADING.visible = false;
+	model.SPLASH.visible = false;
 	model.STATUS.visible = true;
 
 	if (threads.length === 0) {
@@ -370,7 +345,7 @@ function renderError(message) {
 		return;
 	}
 
-	model.LOADING.visible = false;
+	model.SPLASH.visible = false;
 	model.STATUS.visible = true;
 	model.STATUS.string = "Error";
 	threads = [];
@@ -385,48 +360,33 @@ function renderError(message) {
 	}
 }
 
-function handleResponse(responseText) {
-	let result;
-
-	try {
-		result = JSON.parse(responseText);
-	} catch (e) {
-		return false;
-	}
-
-	if (result.errors !== undefined) {
-		renderError(result.errors.map((error) => error.message).join(" "));
-		return true;
-	}
-
-	if (result.data === undefined || result.data.threads === undefined) {
-		renderError(responseText);
-		return true;
-	}
-
-	const edges = result.data.threads.edges;
-	threads = [];
-
-	for (let i = 0; i < edges.length; i += 1) {
-		threads.push(edges[i].node);
-	}
-
-	selectedIndex = 0;
-	firstVisibleIndex = 0;
-	renderRows();
-	return true;
-}
-
 const messages = new Message({
-	keys: ["THREADS", "THREAD_ID", "THREAD_DETAIL", "ERROR"],
+	keys: [
+		"THREADS",
+		"THREAD_ID",
+		"THREAD_DETAIL",
+		"THREAD_DETAIL_ERROR",
+		"ERROR",
+	],
+	input: 2048,
+	output: 256,
 	onReadable() {
 		const msg = this.read();
 		const error = msg.get("ERROR");
 		if (error !== undefined) {
-			if (canHideLoading) {
-				renderError(error);
-			} else {
-				pendingError = error;
+			renderError(error);
+			return;
+		}
+
+		const detailErrorPayload = msg.get("THREAD_DETAIL_ERROR");
+		if (detailErrorPayload !== undefined) {
+			try {
+				const detailError = JSON.parse(detailErrorPayload);
+				if (view === "detail" && detailError.threadId === detailThreadId) {
+					renderDetailError(detailError.message);
+				}
+			} catch (e) {
+				renderError(String(e));
 			}
 			return;
 		}
@@ -448,20 +408,12 @@ const messages = new Message({
 
 		try {
 			const nextThreads = JSON.parse(threadPayload);
-			if (canHideLoading) {
-				threads = nextThreads;
-				selectedIndex = 0;
-				firstVisibleIndex = 0;
-				renderRows();
-			} else {
-				pendingThreads = nextThreads;
-			}
+			threads = nextThreads;
+			selectedIndex = 0;
+			firstVisibleIndex = 0;
+			renderRows();
 		} catch (e) {
-			if (canHideLoading) {
-				renderError(String(e));
-			} else {
-				pendingError = String(e);
-			}
+			renderError(String(e));
 		}
 	},
 });
@@ -482,22 +434,3 @@ function requestSelectedThread() {
 	request.set("THREAD_ID", thread.id);
 	messages.write(request);
 }
-
-new Button({
-	types: ["select", "up", "down", "back"],
-	onPush(down, type) {
-		if (!down) {
-			return;
-		}
-
-		if (type === "up") {
-			moveSelection(-1);
-		} else if (type === "down") {
-			moveSelection(1);
-		} else if (type === "select") {
-			requestSelectedThread();
-		} else if (type === "back" && view === "detail") {
-			renderRows();
-		}
-	},
-});

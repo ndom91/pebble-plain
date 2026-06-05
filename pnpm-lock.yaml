@@ -11,12 +11,20 @@ importers:
       '@moddable/pebbleproxy':
         specifier: ^0.1.8
         version: 0.1.8
+      '@rebble/clay':
+        specifier: ^1.0.10
+        version: 1.0.10
 
 packages:
 
   '@moddable/pebbleproxy@0.1.8':
     resolution: {integrity: sha512-Y378u0vM71eskflKOa8xTZ0oVOyJbDRBScZiR1uez+RP5u1KOocBrL+bEShOjVkipfVZNlQnC5DGpzSJhX6O7g==}
 
+  '@rebble/clay@1.0.10':
+    resolution: {integrity: sha512-84EL9J6egrnWk/FzqCxRa9/vqO4fx7SBxdttthLEpBro+FVqUg+rMlqOzT8+zl4PkBQKAWdnqHwlHaS4heiXKg==}
+
 snapshots:
 
   '@moddable/pebbleproxy@0.1.8': {}
+
+  '@rebble/clay@1.0.10': {}
