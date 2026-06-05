@@ -1,7 +1,7 @@
 import Message from "pebble/message";
 import {} from "piu/MC";
 
-const ROW_COUNT = 6;
+const ROW_COUNT = 4;
 const HEADER_HEIGHT = 28;
 const ROW_HEIGHT = Math.idiv(screen.height - HEADER_HEIGHT, ROW_COUNT);
 const TITLE_WINDOW = 30;
@@ -48,6 +48,7 @@ let view = "list";
 let detailThreadId = null;
 let detailLines = [];
 let detailOffset = 0;
+let detailSelectedIndex = 0;
 let titleScrollIndex = 0;
 let titleScrollPause = TITLE_SCROLL_PAUSE_TICKS;
 
@@ -191,44 +192,6 @@ const ThreadsApplication = Application.template(($) => ({
 				}),
 			],
 		}),
-		Container($, {
-			anchor: "ROW4",
-			visible: false,
-			left: 0,
-			right: 0,
-			top: HEADER_HEIGHT + ROW_HEIGHT * 4,
-			height: ROW_HEIGHT,
-			skin: rowSkin,
-			contents: [
-				Label($, {
-					anchor: "TITLE4",
-					left: 0,
-					right: 0,
-					top: 0,
-					bottom: 0,
-					style: rowStyle,
-				}),
-			],
-		}),
-		Container($, {
-			anchor: "ROW5",
-			visible: false,
-			left: 0,
-			right: 0,
-			top: HEADER_HEIGHT + ROW_HEIGHT * 5,
-			height: ROW_HEIGHT,
-			skin: rowSkin,
-			contents: [
-				Label($, {
-					anchor: "TITLE5",
-					left: 0,
-					right: 0,
-					top: 0,
-					bottom: 0,
-					style: rowStyle,
-				}),
-			],
-		}),
 	],
 }));
 
@@ -251,18 +214,14 @@ function getRow(index) {
 	if (index === 0) return model.ROW0;
 	if (index === 1) return model.ROW1;
 	if (index === 2) return model.ROW2;
-	if (index === 3) return model.ROW3;
-	if (index === 4) return model.ROW4;
-	return model.ROW5;
+	return model.ROW3;
 }
 
 function getTitle(index) {
 	if (index === 0) return model.TITLE0;
 	if (index === 1) return model.TITLE1;
 	if (index === 2) return model.TITLE2;
-	if (index === 3) return model.TITLE3;
-	if (index === 4) return model.TITLE4;
-	return model.TITLE5;
+	return model.TITLE3;
 }
 
 function formatThread(thread) {
@@ -286,24 +245,44 @@ function resetTitleScroll() {
 }
 
 function renderSelectedTitle() {
-	if (view !== "list" || threads.length === 0) {
+	if (view === "list") {
+		if (threads.length === 0) {
+			return;
+		}
+
+		const rowIndex = selectedIndex - firstVisibleIndex;
+		if (rowIndex < 0 || rowIndex >= ROW_COUNT) {
+			return;
+		}
+
+		getTitle(rowIndex).string = marqueeText(formatThread(threads[selectedIndex]));
 		return;
 	}
 
-	const rowIndex = selectedIndex - firstVisibleIndex;
+	if (view !== "detail" || detailLines.length === 0) {
+		return;
+	}
+
+	const rowIndex = detailSelectedIndex - detailOffset;
 	if (rowIndex < 0 || rowIndex >= ROW_COUNT) {
 		return;
 	}
 
-	getTitle(rowIndex).string = marqueeText(formatThread(threads[selectedIndex]));
+	getTitle(rowIndex).string = marqueeText(detailLines[detailSelectedIndex]);
 }
 
 function advanceTitleScroll() {
-	if (view !== "list" || threads.length === 0) {
+	let text = "";
+
+	if (view === "list" && threads.length !== 0) {
+		text = formatThread(threads[selectedIndex]);
+	} else if (view === "detail" && detailLines.length !== 0) {
+		text = detailLines[detailSelectedIndex];
+	} else {
 		return;
 	}
 
-	if (formatThread(threads[selectedIndex]).length <= TITLE_WINDOW) {
+	if (text.length <= TITLE_WINDOW) {
 		return;
 	}
 
@@ -325,12 +304,13 @@ function renderDetailRows() {
 		const row = getRow(i);
 		const title = getTitle(i);
 		const visible = lineIndex < detailLines.length;
+		const active = visible && lineIndex === detailSelectedIndex;
 
 		row.visible = visible;
-		row.state = visible && lineIndex === 0 ? 1 : 0;
+		row.state = active ? 1 : 0;
 		title.style = detailStyle;
 		title.state = row.state;
-		title.string = visible ? detailLines[lineIndex] : "";
+		title.string = visible ? (active ? marqueeText(detailLines[lineIndex]) : shorten(detailLines[lineIndex], TITLE_WINDOW)) : "";
 	}
 }
 
@@ -338,7 +318,9 @@ function renderDetailLoading(thread) {
 	view = "detail";
 	detailThreadId = thread.id;
 	detailOffset = 0;
+	detailSelectedIndex = 0;
 	detailLines = [`Loading ${thread.ref}...`];
+	resetTitleScroll();
 	model.STATUS.string = thread.ref;
 	renderDetailRows();
 }
@@ -350,6 +332,8 @@ function renderDetail(detail) {
 
 	view = "detail";
 	detailOffset = 0;
+	detailSelectedIndex = 0;
+	resetTitleScroll();
 	model.STATUS.string = `${detail.ref} ${detail.status} ${detail.priorityLabel}`;
 	detailLines = [detail.title];
 
@@ -380,6 +364,8 @@ function renderDetail(detail) {
 
 function renderDetailError(message) {
 	detailOffset = 0;
+	detailSelectedIndex = 0;
+	resetTitleScroll();
 	detailLines = ["Error", shorten(message, 90)];
 	model.STATUS.string = "Thread detail";
 	renderDetailRows();
@@ -390,6 +376,7 @@ function renderRows() {
 	detailThreadId = null;
 	detailLines = [];
 	detailOffset = 0;
+	detailSelectedIndex = 0;
 	resetTitleScroll();
 	model.SPLASH.visible = false;
 	model.STATUS.visible = true;
@@ -432,16 +419,24 @@ function renderRows() {
 
 function moveSelection(delta) {
 	if (view === "detail") {
-		const maxOffset = detailLines.length - ROW_COUNT;
-		detailOffset += delta;
-		if (detailOffset < 0) {
-			detailOffset = 0;
-		} else if (detailOffset > maxOffset) {
-			detailOffset = maxOffset;
+		if (detailLines.length === 0) {
+			return;
 		}
-		if (detailOffset < 0) {
-			detailOffset = 0;
+
+		detailSelectedIndex += delta;
+		if (detailSelectedIndex < 0) {
+			detailSelectedIndex = 0;
+		} else if (detailSelectedIndex >= detailLines.length) {
+			detailSelectedIndex = detailLines.length - 1;
 		}
+
+		if (detailSelectedIndex < detailOffset) {
+			detailOffset = detailSelectedIndex;
+		} else if (detailSelectedIndex >= detailOffset + ROW_COUNT) {
+			detailOffset = detailSelectedIndex - ROW_COUNT + 1;
+		}
+
+		resetTitleScroll();
 		renderDetailRows();
 		return;
 	}
