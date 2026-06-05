@@ -1,7 +1,7 @@
 import Message from "pebble/message";
 import {} from "piu/MC";
 
-const ROW_COUNT = 4;
+const ROW_COUNT = 5;
 const HEADER_HEIGHT = 28;
 const ROW_HEIGHT = Math.idiv(screen.height - HEADER_HEIGHT, ROW_COUNT);
 const TITLE_WINDOW = 30;
@@ -192,6 +192,25 @@ const ThreadsApplication = Application.template(($) => ({
 				}),
 			],
 		}),
+		Container($, {
+			anchor: "ROW4",
+			visible: false,
+			left: 0,
+			right: 0,
+			top: HEADER_HEIGHT + ROW_HEIGHT * 4,
+			height: ROW_HEIGHT,
+			skin: rowSkin,
+			contents: [
+				Label($, {
+					anchor: "TITLE4",
+					left: 0,
+					right: 0,
+					top: 0,
+					bottom: 0,
+					style: rowStyle,
+				}),
+			],
+		}),
 	],
 }));
 
@@ -214,14 +233,16 @@ function getRow(index) {
 	if (index === 0) return model.ROW0;
 	if (index === 1) return model.ROW1;
 	if (index === 2) return model.ROW2;
-	return model.ROW3;
+	if (index === 3) return model.ROW3;
+	return model.ROW4;
 }
 
 function getTitle(index) {
 	if (index === 0) return model.TITLE0;
 	if (index === 1) return model.TITLE1;
 	if (index === 2) return model.TITLE2;
-	return model.TITLE3;
+	if (index === 3) return model.TITLE3;
+	return model.TITLE4;
 }
 
 function formatThread(thread) {
