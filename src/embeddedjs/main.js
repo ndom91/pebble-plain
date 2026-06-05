@@ -1,7 +1,7 @@
 import Message from "pebble/message";
 import {} from "piu/MC";
 
-const ROW_COUNT = 4;
+const ROW_COUNT = 6;
 const HEADER_HEIGHT = 28;
 const ROW_HEIGHT = Math.idiv(screen.height - HEADER_HEIGHT, ROW_COUNT);
 const TITLE_WINDOW = 30;
@@ -25,6 +25,14 @@ const statusStyle = new Style({
 });
 const rowStyle = new Style({
 	font: "bold 18px Gothic",
+	color: ["white", "#06231E"],
+	horizontal: "left",
+	vertical: "middle",
+	left: 6,
+	right: 6,
+});
+const detailStyle = new Style({
+	font: "14px Gothic",
 	color: ["white", "#06231E"],
 	horizontal: "left",
 	vertical: "middle",
@@ -183,6 +191,44 @@ const ThreadsApplication = Application.template(($) => ({
 				}),
 			],
 		}),
+		Container($, {
+			anchor: "ROW4",
+			visible: false,
+			left: 0,
+			right: 0,
+			top: HEADER_HEIGHT + ROW_HEIGHT * 4,
+			height: ROW_HEIGHT,
+			skin: rowSkin,
+			contents: [
+				Label($, {
+					anchor: "TITLE4",
+					left: 0,
+					right: 0,
+					top: 0,
+					bottom: 0,
+					style: rowStyle,
+				}),
+			],
+		}),
+		Container($, {
+			anchor: "ROW5",
+			visible: false,
+			left: 0,
+			right: 0,
+			top: HEADER_HEIGHT + ROW_HEIGHT * 5,
+			height: ROW_HEIGHT,
+			skin: rowSkin,
+			contents: [
+				Label($, {
+					anchor: "TITLE5",
+					left: 0,
+					right: 0,
+					top: 0,
+					bottom: 0,
+					style: rowStyle,
+				}),
+			],
+		}),
 	],
 }));
 
@@ -205,14 +251,18 @@ function getRow(index) {
 	if (index === 0) return model.ROW0;
 	if (index === 1) return model.ROW1;
 	if (index === 2) return model.ROW2;
-	return model.ROW3;
+	if (index === 3) return model.ROW3;
+	if (index === 4) return model.ROW4;
+	return model.ROW5;
 }
 
 function getTitle(index) {
 	if (index === 0) return model.TITLE0;
 	if (index === 1) return model.TITLE1;
 	if (index === 2) return model.TITLE2;
-	return model.TITLE3;
+	if (index === 3) return model.TITLE3;
+	if (index === 4) return model.TITLE4;
+	return model.TITLE5;
 }
 
 function formatThread(thread) {
@@ -278,6 +328,7 @@ function renderDetailRows() {
 
 		row.visible = visible;
 		row.state = visible && lineIndex === 0 ? 1 : 0;
+		title.style = detailStyle;
 		title.state = row.state;
 		title.string = visible ? detailLines[lineIndex] : "";
 	}
@@ -350,6 +401,7 @@ function renderRows() {
 			const title = getTitle(i);
 			row.visible = i === 0;
 			row.state = 0;
+			title.style = rowStyle;
 			title.state = 0;
 			title.string = i === 0 ? "Nothing to show" : "";
 		}
@@ -371,6 +423,7 @@ function renderRows() {
 			const text = formatThread(threads[threadIndex]);
 			row.visible = true;
 			row.state = state;
+			title.style = rowStyle;
 			title.state = state;
 			title.string = state === 1 ? marqueeText(text) : shorten(text, TITLE_WINDOW);
 		}
@@ -431,6 +484,7 @@ function renderError(message) {
 		const title = getTitle(i);
 		row.visible = i === 0;
 		row.state = 0;
+		title.style = rowStyle;
 		title.state = 0;
 		title.string = i === 0 ? shorten(message, 30) : "";
 	}
