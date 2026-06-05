@@ -195,7 +195,7 @@ const ThreadsApplication = Application.template(($) => ({
 	],
 }));
 
-new ThreadsApplication(model, { displayListLength: 2048 });
+new ThreadsApplication(model, { displayListLength: 1024 });
 
 function shorten(value, max) {
 	if (value === undefined || value === null) {
@@ -314,9 +314,9 @@ function renderDetailRows() {
 	}
 }
 
-function renderDetailLoading(thread) {
+function renderDetailLoading(thread, threadIndex) {
 	view = "detail";
-	detailThreadId = thread.id;
+	detailThreadId = threadIndex;
 	detailOffset = 0;
 	detailSelectedIndex = 0;
 	detailLines = [`Loading ${thread.ref}...`];
@@ -493,8 +493,8 @@ const messages = new Message({
 		"THREAD_DETAIL_ERROR",
 		"ERROR",
 	],
-	input: 2048,
-	output: 256,
+	input: 1536,
+	output: 128,
 	onReadable() {
 		const msg = this.read();
 		const error = msg.get("ERROR");
@@ -549,13 +549,10 @@ function requestSelectedThread() {
 	}
 
 	const thread = threads[selectedIndex];
-	if (thread.id === undefined) {
-		renderError("Thread id missing");
-		return;
-	}
+	const threadIndex = String(selectedIndex);
 
-	renderDetailLoading(thread);
+	renderDetailLoading(thread, threadIndex);
 	const request = new Map();
-	request.set("THREAD_ID", thread.id);
+	request.set("THREAD_ID", threadIndex);
 	messages.write(request);
 }

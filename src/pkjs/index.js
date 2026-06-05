@@ -5,6 +5,7 @@ const plain = require("./plain");
 const settings = require("./settings");
 
 const clay = new Clay(clayConfig, null, { autoHandleEvents: false });
+let threadIds = [];
 
 function sendToWatch(payload) {
 	const onFailure = function (error) {
@@ -21,6 +22,7 @@ function sendToWatch(payload) {
 }
 
 function sendError(message) {
+	threadIds = [];
 	sendToWatch({ ERROR: plain.shorten(message, 120) });
 }
 
@@ -57,22 +59,41 @@ function fetchTodoThreads() {
 	}
 
 	plain.fetchTodoThreads(apiKey, function (threads) {
-		sendToWatch({ THREADS: JSON.stringify(threads) });
+		const watchThreads = [];
+		threadIds = [];
+
+		for (let i = 0; i < threads.length; i += 1) {
+			threadIds.push(threads[i].id);
+			watchThreads.push({
+				ref: threads[i].ref,
+				title: threads[i].title,
+			});
+		}
+
+		sendToWatch({ THREADS: JSON.stringify(watchThreads) });
 	}, sendError);
 }
 
-function fetchThreadDetail(threadId) {
+function fetchThreadDetail(threadIndexText) {
+	const threadIndex = Number(threadIndexText);
+	if (!Number.isInteger(threadIndex) || threadIndex < 0 || threadIndex >= threadIds.length) {
+		sendThreadDetailError(threadIndexText, "Thread selection expired. Refresh the list.");
+		return;
+	}
+
+	const threadId = threadIds[threadIndex];
 	const apiKey = configuredApiKey(function (message) {
-		sendThreadDetailError(threadId, message);
+		sendThreadDetailError(threadIndexText, message);
 	});
 	if (apiKey === null) {
 		return;
 	}
 
 	plain.fetchThreadDetail(apiKey, threadId, function (detail) {
+		detail.threadId = threadIndexText;
 		sendToWatch({ THREAD_DETAIL: JSON.stringify(detail) });
 	}, function (message) {
-		sendThreadDetailError(threadId, message);
+		sendThreadDetailError(threadIndexText, message);
 	});
 }
 
