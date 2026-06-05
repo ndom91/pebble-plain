@@ -202,7 +202,7 @@ function fetchTodoThreads(apiKey, onThreads, onError) {
 		const threads = data.threads.edges.map((edge) => ({
 			id: edge.node.id,
 			ref: edge.node.ref,
-			title: shorten(edge.node.title, 40),
+			title: shorten(edge.node.title, 80),
 		}));
 
 		onThreads(threads);

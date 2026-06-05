@@ -4,6 +4,9 @@ import {} from "piu/MC";
 const ROW_COUNT = 4;
 const HEADER_HEIGHT = 28;
 const ROW_HEIGHT = Math.idiv(screen.height - HEADER_HEIGHT, ROW_COUNT);
+const TITLE_WINDOW = 30;
+const TITLE_SCROLL_INTERVAL = 650;
+const TITLE_SCROLL_PAUSE_TICKS = 1;
 let suppressBackRelease = false;
 
 const backgroundSkin = new Skin({ fill: "black" });
@@ -37,10 +40,22 @@ let view = "list";
 let detailThreadId = null;
 let detailLines = [];
 let detailOffset = 0;
+let titleScrollIndex = 0;
+let titleScrollPause = TITLE_SCROLL_PAUSE_TICKS;
 
 class AppBehavior extends Behavior {
 	onDisplaying(application) {
+		application.duration = 86400000;
+		application.interval = TITLE_SCROLL_INTERVAL;
+		application.start();
 		application.focus();
+	}
+	onFinished(application) {
+		application.time = 0;
+		application.start();
+	}
+	onTimeChanged() {
+		advanceTitleScroll();
 	}
 	onPressBack() {
 		if (view === "detail") {
@@ -201,7 +216,54 @@ function getTitle(index) {
 }
 
 function formatThread(thread) {
-	return `${thread.ref} ${shorten(thread.title, 24)}`;
+	return `${thread.ref} ${thread.title}`;
+}
+
+function marqueeText(text) {
+	if (text.length <= TITLE_WINDOW) {
+		return text;
+	}
+
+	const gap = "   ";
+	const loop = text + gap + text;
+	const index = titleScrollIndex % (text.length + gap.length);
+	return loop.slice(index, index + TITLE_WINDOW);
+}
+
+function resetTitleScroll() {
+	titleScrollIndex = 0;
+	titleScrollPause = TITLE_SCROLL_PAUSE_TICKS;
+}
+
+function renderSelectedTitle() {
+	if (view !== "list" || threads.length === 0) {
+		return;
+	}
+
+	const rowIndex = selectedIndex - firstVisibleIndex;
+	if (rowIndex < 0 || rowIndex >= ROW_COUNT) {
+		return;
+	}
+
+	getTitle(rowIndex).string = marqueeText(formatThread(threads[selectedIndex]));
+}
+
+function advanceTitleScroll() {
+	if (view !== "list" || threads.length === 0) {
+		return;
+	}
+
+	if (formatThread(threads[selectedIndex]).length <= TITLE_WINDOW) {
+		return;
+	}
+
+	if (titleScrollPause > 0) {
+		titleScrollPause -= 1;
+		return;
+	}
+
+	titleScrollIndex += 1;
+	renderSelectedTitle();
 }
 
 function renderDetailRows() {
@@ -269,6 +331,7 @@ function renderRows() {
 	detailThreadId = null;
 	detailLines = [];
 	detailOffset = 0;
+	resetTitleScroll();
 	model.SPLASH.visible = false;
 	model.STATUS.visible = true;
 
@@ -295,10 +358,11 @@ function renderRows() {
 			title.string = "";
 		} else {
 			const state = threadIndex === selectedIndex ? 1 : 0;
+			const text = formatThread(threads[threadIndex]);
 			row.visible = true;
 			row.state = state;
 			title.state = state;
-			title.string = formatThread(threads[threadIndex]);
+			title.string = state === 1 ? marqueeText(text) : shorten(text, TITLE_WINDOW);
 		}
 	}
 }
