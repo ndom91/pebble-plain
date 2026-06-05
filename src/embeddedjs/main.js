@@ -9,23 +9,23 @@ const TITLE_SCROLL_INTERVAL = 650;
 const TITLE_SCROLL_PAUSE_TICKS = 1;
 let suppressBackRelease = false;
 
-const backgroundSkin = new Skin({ fill: "black" });
-const rowSkin = new Skin({ fill: ["black", "white"] });
+const backgroundSkin = new Skin({ fill: "#071018" });
+const rowSkin = new Skin({ fill: ["#071018", "#55D6BE"] });
 const splashStyle = new Style({
 	font: "bold 18px Gothic",
-	color: "white",
+	color: "#55D6BE",
 	horizontal: "center",
 	vertical: "middle",
 });
 const statusStyle = new Style({
-	font: "bold 18px Gothic",
-	color: "white",
+	font: "bold 14px Gothic",
+	color: "#55D6BE",
 	horizontal: "center",
 	vertical: "middle",
 });
 const rowStyle = new Style({
 	font: "bold 18px Gothic",
-	color: ["white", "black"],
+	color: ["white", "#06231E"],
 	horizontal: "left",
 	vertical: "middle",
 	left: 6,
@@ -274,11 +274,12 @@ function renderDetailRows() {
 		const lineIndex = detailOffset + i;
 		const row = getRow(i);
 		const title = getTitle(i);
+		const visible = lineIndex < detailLines.length;
 
-		row.visible = lineIndex < detailLines.length;
-		row.state = 0;
-		title.state = 0;
-		title.string = lineIndex < detailLines.length ? detailLines[lineIndex] : "";
+		row.visible = visible;
+		row.state = visible && lineIndex === 0 ? 1 : 0;
+		title.state = row.state;
+		title.string = visible ? detailLines[lineIndex] : "";
 	}
 }
 
@@ -298,8 +299,15 @@ function renderDetail(detail) {
 
 	view = "detail";
 	detailOffset = 0;
-	model.STATUS.string = `${detail.ref} ${detail.status}`;
+	model.STATUS.string = `${detail.ref} ${detail.status} ${detail.priorityLabel}`;
 	detailLines = [detail.title];
+
+	if (detail.customer !== "") {
+		detailLines.push(`From ${detail.customer}`);
+	}
+	if (detail.updatedAt !== "") {
+		detailLines.push(`Updated ${detail.updatedAt}`);
+	}
 
 	if (detail.description !== "") {
 		detailLines.push(detail.description);
@@ -310,7 +318,7 @@ function renderDetail(detail) {
 	if (detail.messages.length === 0) {
 		detailLines.push("No messages");
 	} else {
-		detailLines.push("Messages:");
+		detailLines.push("Messages");
 		for (let i = 0; i < detail.messages.length; i += 1) {
 			detailLines.push(detail.messages[i]);
 		}
@@ -338,10 +346,12 @@ function renderRows() {
 	if (threads.length === 0) {
 		model.STATUS.string = "No TODO threads";
 		for (let i = 0; i < ROW_COUNT; i += 1) {
-			getRow(i).visible = i === 0;
-			getRow(i).state = 0;
-			getTitle(i).state = 0;
-			getTitle(i).string = i === 0 ? "Nothing to show" : "";
+			const row = getRow(i);
+			const title = getTitle(i);
+			row.visible = i === 0;
+			row.state = 0;
+			title.state = 0;
+			title.string = i === 0 ? "Nothing to show" : "";
 		}
 		return;
 	}
@@ -417,10 +427,12 @@ function renderError(message) {
 	firstVisibleIndex = 0;
 
 	for (let i = 0; i < ROW_COUNT; i += 1) {
-		getRow(i).visible = i === 0;
-		getRow(i).state = 0;
-		getTitle(i).state = 0;
-		getTitle(i).string = i === 0 ? shorten(message, 30) : "";
+		const row = getRow(i);
+		const title = getTitle(i);
+		row.visible = i === 0;
+		row.state = 0;
+		title.state = 0;
+		title.string = i === 0 ? shorten(message, 30) : "";
 	}
 }
 

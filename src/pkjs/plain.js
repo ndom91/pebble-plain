@@ -27,12 +27,19 @@ const threadDetailQuery = `
   query pebbleThreadDetail($threadId: ID!) {
     thread(threadId: $threadId) {
       id
-      ref
-      title
-      description
-      previewText
-      status
-      timelineEntries(filters: { isMessage: true }, last: 5) {
+              ref
+              title
+              description
+              previewText
+              priority
+              status
+              customer {
+                fullName
+                email {
+                  email
+                }
+              }
+              timelineEntries(filters: { isMessage: true }, last: 5) {
         edges {
           node {
             entry {
@@ -222,6 +229,11 @@ function fetchThreadDetail(apiKey, threadId, onDetail, onError) {
 
 		const messages = [];
 		const edges = data.thread.timelineEntries.edges;
+		const customer = data.thread.customer;
+		const customerEmail = customer && customer.email ? customer.email.email : "";
+		const customerText = customer ? compactText(customer.fullName || customerEmail) : "";
+		const priorityLabel = data.thread.priority === null || data.thread.priority === undefined ? "" : "P" + data.thread.priority;
+
 		for (let i = 0; i < edges.length; i += 1) {
 			const text = entryText(edges[i].node.entry);
 			if (text !== "") {
@@ -235,7 +247,10 @@ function fetchThreadDetail(apiKey, threadId, onDetail, onError) {
 			title: shorten(data.thread.title, 80),
 			description: shorten(compactText(data.thread.description), 80),
 			previewText: shorten(compactText(data.thread.previewText), 80),
+			priorityLabel: priorityLabel,
 			status: data.thread.status,
+			customer: shorten(customerText, 60),
+			updatedAt: "",
 			messages: messages,
 		});
 	}, onError);
