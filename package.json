@@ -1,0 +1,33 @@
+{
+  "name": "watchapp",
+  "author": "MakeAwesomeHappen",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {
+    "@moddable/pebbleproxy": "^0.1.8"
+  },
+  "pebble": {
+    "displayName": "watchapp",
+    "uuid": "845c1b8a-3ed8-4d8a-9f2a-816bcf794777",
+    "projectType": "moddable",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "emery",
+      "gabbro"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "THREADS",
+      "ERROR"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

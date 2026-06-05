@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@moddable/pebbleproxy':
+        specifier: ^0.1.8
+        version: 0.1.8
+
+packages:
+
+  '@moddable/pebbleproxy@0.1.8':
+    resolution: {integrity: sha512-Y378u0vM71eskflKOa8xTZ0oVOyJbDRBScZiR1uez+RP5u1KOocBrL+bEShOjVkipfVZNlQnC5DGpzSJhX6O7g==}
+
+snapshots:
+
+  '@moddable/pebbleproxy@0.1.8': {}
