@@ -57,6 +57,10 @@ const model = {};
 let threads = [];
 let selectedIndex = 0;
 let firstVisibleIndex = 0;
+let view = "list";
+let detailThreadId = null;
+let detailLines = [];
+let detailOffset = 0;
 let pendingThreads = null;
 let pendingError = null;
 let canHideLoading = false;
@@ -192,7 +196,7 @@ Timer.set(() => {
 		firstVisibleIndex = 0;
 		renderRows();
 	}
-}, 2000);
+}, 1000);
 
 function shorten(value, max) {
 	if (value === undefined || value === null) {
@@ -225,7 +229,71 @@ function formatThread(thread) {
 	return `${thread.ref} ${shorten(thread.title, 24)}`;
 }
 
+function renderDetailRows() {
+	model.LOADING.visible = false;
+	model.STATUS.visible = true;
+
+	for (let i = 0; i < ROW_COUNT; i += 1) {
+		const lineIndex = detailOffset + i;
+		const row = getRow(i);
+		const title = getTitle(i);
+
+		row.visible = lineIndex < detailLines.length;
+		row.state = 0;
+		title.state = 0;
+		title.string = lineIndex < detailLines.length ? detailLines[lineIndex] : "";
+	}
+}
+
+function renderDetailLoading(thread) {
+	view = "detail";
+	detailThreadId = thread.id;
+	detailOffset = 0;
+	detailLines = [`Loading ${thread.ref}...`];
+	model.STATUS.string = thread.ref;
+	renderDetailRows();
+}
+
+function renderDetail(detail) {
+	if (detail.threadId !== detailThreadId) {
+		return;
+	}
+
+	view = "detail";
+	detailOffset = 0;
+	model.STATUS.string = `${detail.ref} ${detail.status}`;
+	detailLines = [detail.title];
+
+	if (detail.description !== "") {
+		detailLines.push(detail.description);
+	} else if (detail.previewText !== "") {
+		detailLines.push(detail.previewText);
+	}
+
+	if (detail.messages.length === 0) {
+		detailLines.push("No messages");
+	} else {
+		detailLines.push("Messages:");
+		for (let i = 0; i < detail.messages.length; i += 1) {
+			detailLines.push(detail.messages[i]);
+		}
+	}
+
+	renderDetailRows();
+}
+
+function renderDetailError(message) {
+	detailOffset = 0;
+	detailLines = ["Error", shorten(message, 90)];
+	model.STATUS.string = "Thread detail";
+	renderDetailRows();
+}
+
 function renderRows() {
+	view = "list";
+	detailThreadId = null;
+	detailLines = [];
+	detailOffset = 0;
 	model.LOADING.visible = false;
 	model.STATUS.visible = true;
 
@@ -261,6 +329,21 @@ function renderRows() {
 }
 
 function moveSelection(delta) {
+	if (view === "detail") {
+		const maxOffset = detailLines.length - ROW_COUNT;
+		detailOffset += delta;
+		if (detailOffset < 0) {
+			detailOffset = 0;
+		} else if (detailOffset > maxOffset) {
+			detailOffset = maxOffset;
+		}
+		if (detailOffset < 0) {
+			detailOffset = 0;
+		}
+		renderDetailRows();
+		return;
+	}
+
 	if (threads.length === 0) {
 		return;
 	}
@@ -282,6 +365,11 @@ function moveSelection(delta) {
 }
 
 function renderError(message) {
+	if (view === "detail") {
+		renderDetailError(message);
+		return;
+	}
+
 	model.LOADING.visible = false;
 	model.STATUS.visible = true;
 	model.STATUS.string = "Error";
@@ -329,23 +417,8 @@ function handleResponse(responseText) {
 	return true;
 }
 
-new Button({
-	types: ["up", "down"],
-	onPush(down, type) {
-		if (!down) {
-			return;
-		}
-
-		if (type === "up") {
-			moveSelection(-1);
-		} else if (type === "down") {
-			moveSelection(1);
-		}
-	},
-});
-
-new Message({
-	keys: ["THREADS", "ERROR"],
+const messages = new Message({
+	keys: ["THREADS", "THREAD_ID", "THREAD_DETAIL", "ERROR"],
 	onReadable() {
 		const msg = this.read();
 		const error = msg.get("ERROR");
@@ -354,6 +427,16 @@ new Message({
 				renderError(error);
 			} else {
 				pendingError = error;
+			}
+			return;
+		}
+
+		const detailPayload = msg.get("THREAD_DETAIL");
+		if (detailPayload !== undefined) {
+			try {
+				renderDetail(JSON.parse(detailPayload));
+			} catch (e) {
+				renderError(String(e));
 			}
 			return;
 		}
@@ -379,6 +462,42 @@ new Message({
 			} else {
 				pendingError = String(e);
 			}
+		}
+	},
+});
+
+function requestSelectedThread() {
+	if (view !== "list" || threads.length === 0) {
+		return;
+	}
+
+	const thread = threads[selectedIndex];
+	if (thread.id === undefined) {
+		renderError("Thread id missing");
+		return;
+	}
+
+	renderDetailLoading(thread);
+	const request = new Map();
+	request.set("THREAD_ID", thread.id);
+	messages.write(request);
+}
+
+new Button({
+	types: ["select", "up", "down", "back"],
+	onPush(down, type) {
+		if (!down) {
+			return;
+		}
+
+		if (type === "up") {
+			moveSelection(-1);
+		} else if (type === "down") {
+			moveSelection(1);
+		} else if (type === "select") {
+			requestSelectedThread();
+		} else if (type === "back" && view === "detail") {
+			renderRows();
 		}
 	},
 });

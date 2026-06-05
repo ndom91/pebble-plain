@@ -24,6 +24,8 @@
     },
     "messageKeys": [
       "THREADS",
+      "THREAD_ID",
+      "THREAD_DETAIL",
       "ERROR"
     ],
     "resources": {
