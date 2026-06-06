@@ -1,6 +1,6 @@
 {
   "name": "plain-pebble",
-  "description": "View Plain TODO support threads, details, and recent messages on Pebble.",
+  "description": "View Plain support threads, details, and recent messages on Pebble.",
   "author": "ndom91",
   "version": "1.0.0",
   "repository": {
