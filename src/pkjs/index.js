@@ -93,18 +93,15 @@ function fetchTodoThreads() {
 	}
 
 	plain.fetchTodoThreads(apiKey, function (threads) {
-		const watchThreads = [];
 		threadIds = [];
+		sendToWatch({ THREADS_START: "1" });
 
 		for (let i = 0; i < threads.length; i += 1) {
 			threadIds.push(threads[i].id);
-			watchThreads.push({
-				ref: threads[i].ref,
-				title: threads[i].title,
-			});
+			sendToWatch({ THREAD_LINE: threads[i].ref + "\n" + threads[i].title });
 		}
 
-		sendToWatch({ THREADS: JSON.stringify(watchThreads) });
+		sendToWatch({ THREADS_DONE: "1" });
 	}, sendError);
 }
 

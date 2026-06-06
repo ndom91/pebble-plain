@@ -449,6 +449,39 @@ function renderRows() {
 	}
 }
 
+function renderThreadsLoading() {
+	view = "list";
+	detailThreadId = null;
+	detailLines = [];
+	detailOffset = 0;
+	detailSelectedIndex = 0;
+	threads = [];
+	selectedIndex = 0;
+	firstVisibleIndex = 0;
+	resetTitleScroll();
+	model.SPLASH.visible = false;
+	model.STATUS.visible = true;
+	model.STATUS.string = "Loading TODO...";
+
+	for (let i = 0; i < ROW_COUNT; i += 1) {
+		const row = getRow(i);
+		const title = getTitle(i);
+		row.visible = false;
+		row.state = 0;
+		title.style = rowStyle;
+		title.state = 0;
+		title.string = "";
+	}
+}
+
+function addThreadLine(payload) {
+	const thread = splitScopedMessage(payload);
+	threads.push({
+		ref: thread.threadId,
+		title: thread.text,
+	});
+}
+
 function moveSelection(delta) {
 	if (view === "detail") {
 		if (detailLines.length === 0) {
@@ -519,7 +552,9 @@ function renderError(message) {
 
 const messages = new Message({
 	keys: [
-		"THREADS",
+		"THREADS_START",
+		"THREAD_LINE",
+		"THREADS_DONE",
 		"THREAD_ID",
 		"THREAD_DETAIL_START",
 		"THREAD_DETAIL_LINE",
@@ -527,7 +562,7 @@ const messages = new Message({
 		"THREAD_DETAIL_ERROR",
 		"ERROR",
 	],
-	input: 1536,
+	input: 768,
 	output: 128,
 	onReadable() {
 		const msg = this.read();
@@ -564,19 +599,22 @@ const messages = new Message({
 			return;
 		}
 
-		const threadPayload = msg.get("THREADS");
-		if (threadPayload === undefined) {
+		const threadsStartPayload = msg.get("THREADS_START");
+		if (threadsStartPayload !== undefined) {
+			renderThreadsLoading();
 			return;
 		}
 
-		try {
-			const nextThreads = JSON.parse(threadPayload);
-			threads = nextThreads;
-			selectedIndex = 0;
-			firstVisibleIndex = 0;
+		const threadLinePayload = msg.get("THREAD_LINE");
+		if (threadLinePayload !== undefined) {
+			addThreadLine(threadLinePayload);
+			return;
+		}
+
+		const threadsDonePayload = msg.get("THREADS_DONE");
+		if (threadsDonePayload !== undefined) {
 			renderRows();
-		} catch (e) {
-			renderError(String(e));
+			return;
 		}
 	},
 });
