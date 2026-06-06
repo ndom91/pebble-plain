@@ -1,9 +1,13 @@
 {
-  "name": "watchapp",
+  "name": "plain-pebble",
+  "description": "View Plain TODO support threads, details, and recent messages on Pebble.",
   "author": "ndom91",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "keywords": [
-    "pebble-app"
+    "pebble-app",
+    "plain",
+    "support",
+    "threads"
   ],
   "private": true,
   "dependencies": {
