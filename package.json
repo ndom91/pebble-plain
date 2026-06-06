@@ -7,7 +7,6 @@
   ],
   "private": true,
   "dependencies": {
-    "@moddable/pebbleproxy": "^0.1.8",
     "@rebble/clay": "^1.0.10"
   },
   "scripts": {
@@ -18,7 +17,7 @@
   "pebble": {
     "displayName": "Plain",
     "uuid": "845c1b8a-3ed8-4d8a-9f2a-816bcf794777",
-    "projectType": "moddable",
+    "projectType": "native",
     "sdkVersion": "3",
     "enableMultiJS": true,
     "capabilities": [

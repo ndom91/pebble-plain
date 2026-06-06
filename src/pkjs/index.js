@@ -1,4 +1,3 @@
-const moddableProxy = require("@moddable/pebbleproxy");
 const Clay = require("@rebble/clay");
 const clayConfig = require("./config");
 const plain = require("./plain");
@@ -20,11 +19,7 @@ function sendToWatch(payload) {
 		}
 	};
 
-	if (moddableProxy.sendAppMessage) {
-		moddableProxy.sendAppMessage(payload);
-	} else {
-		Pebble.sendAppMessage(payload, null, onFailure);
-	}
+	Pebble.sendAppMessage(payload, null, onFailure);
 }
 
 function sendError(message) {
@@ -128,8 +123,7 @@ function fetchThreadDetail(threadIndexText) {
 	});
 }
 
-Pebble.addEventListener("ready", function (e) {
-	moddableProxy.readyReceived(e);
+Pebble.addEventListener("ready", function () {
 	fetchTodoThreads();
 });
 
@@ -160,8 +154,6 @@ Pebble.addEventListener("webviewclosed", function (e) {
 });
 
 Pebble.addEventListener("appmessage", function (e) {
-	if (moddableProxy.appMessageReceived(e)) return;
-
 	if (e.payload.THREAD_ID) {
 		fetchThreadDetail(e.payload.THREAD_ID);
 	}
