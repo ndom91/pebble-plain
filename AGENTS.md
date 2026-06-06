@@ -5,10 +5,10 @@ Guidance for AI agents working on this repository.
 ## What this is
 
 A Pebble watchapp that shows [Plain](https://plain.com) support threads with
-status `TODO` on the watch. It is a Pebble "Alloy" project: the watch-side UI
-is embedded JavaScript running on the Moddable XS engine (Piu UI framework),
-glued in via a small C shim. The phone-side companion (PebbleKit JS) talks to
-the Plain GraphQL API and relays compact payloads to the watch.
+status `TODO` on the watch. The watch-side UI is native Pebble C with one
+custom drawing layer, fixed-size buffers, native AppMessage parsing, button
+navigation, and an `AppTimer` marquee. The phone-side companion (PebbleKit JS)
+talks to the Plain GraphQL API and relays compact payloads to the watch.
 
 Targets modern Pebble hardware only: **emery** (Pebble Time 2) and **gabbro**
 (Pebble Round 2).
@@ -16,9 +16,7 @@ Targets modern Pebble hardware only: **emery** (Pebble Time 2) and **gabbro**
 ## Layout
 
 ```
-src/embeddedjs/main.js         Watch UI (Moddable XS + Piu). Thread list + detail views.
-src/embeddedjs/manifest.json   Moddable manifest
-src/c/mdbl.c                   C glue around the Moddable runtime — rarely touched
+src/c/mdbl.c                   Native watch UI, navigation, AppMessage parsing, marquee.
 src/pkjs/index.js              PebbleKit JS entry point (phone side). Wires events, AppMessage.
 src/pkjs/plain.js              Plain GraphQL client (queries, response shaping, error handling)
 src/pkjs/settings.js           API key storage in phone localStorage
@@ -42,7 +40,11 @@ pebble install --emulator emery --logs
 ```
 
 There are no tests and no linter configured. Verify changes by building and
-running in the emulator.
+running in the emulator. Use **emery** as the primary emulator target.
+
+When taking screenshots, wait a bit after launching the emulator. If the
+launcher is shown instead of the app, press right/select a few times to launch
+the `Plain` app before capturing the screenshot.
 
 ## Architecture & data flow
 
@@ -52,9 +54,10 @@ running in the emulator.
 2. Threads are serialized into a single string payload using ASCII separators:
    `\x1f` (FIELD_SEPARATOR) between fields, `\x1e` (RECORD_SEPARATOR) between
    records. Sent to the watch under the `THREADS` message key.
-3. **Watch (embeddedjs)** — `main.js` parses the payload, renders a 5-row list
-   with a header. Select button sends `THREAD_ID` (the list *index*, not the
-   Plain thread ID) back to the phone.
+3. **Watch (C)** — `src/c/mdbl.c` parses the payload into fixed-size buffers,
+   renders a 5-row list with a header, and handles native button navigation.
+   Select sends `THREAD_ID` (the list *index*, not the Plain thread ID) back to
+   the phone.
 4. Phone resolves index → thread ID via the in-memory `threadIds` array,
    fetches detail, replies with `THREAD_DETAIL` (or `THREAD_DETAIL_ERROR`).
 5. Watch renders detail lines (key/value pairs), with marquee scrolling for the
@@ -62,18 +65,19 @@ running in the emulator.
 
 ### Message keys
 
-Declared in `package.json` under `pebble.messageKeys` and mirrored in
-`main.js`'s `Message` constructor. **Both lists must stay in sync** when
-adding/removing keys: `THREADS`, `THREAD_ID`, `THREAD_DETAIL`,
-`THREAD_DETAIL_ERROR`, `ERROR`, `PLAIN_API_KEY`, `CLEAR_API_KEY`.
+Declared in `package.json` under `pebble.messageKeys` and exposed to C through
+the generated `message_keys.auto.h` header. Keep `package.json`, C message-key
+usage, and PKJS payload names in sync when adding/removing keys: `THREADS`,
+`THREAD_ID`, `THREAD_DETAIL`, `THREAD_DETAIL_ERROR`, `ERROR`,
+`PLAIN_API_KEY`, `CLEAR_API_KEY`.
 
 ## Constraints & gotchas
 
-- **Tiny memory budget on the watch.** The watch app declares
-  `input: 1152` / `output: 128` byte message buffers, and the Piu app uses
-  small fixed display/command lists. Keep watch payloads compact: text is
-  shortened phone-side (`messageText`, `shorten`) and sanitized to printable
-  ASCII before sending (`[^\x20-\x7e]` replaced with `?`).
+- **Tiny memory budget on the watch.** The native C app opens AppMessage with
+  `INBOX_SIZE = 1152` and `OUTBOX_SIZE = 128`, and stores parsed data in
+  fixed-size static arrays. Keep watch payloads compact: text is shortened
+  phone-side (`messageText`, `shorten`) and sanitized to printable ASCII before
+  sending (`[^\x20-\x7e]` replaced with `?`).
 - **Payloads are flat strings, not structured objects.** Any new data must fit
   the separator-based encoding. Never emit raw `\x1e`/`\x1f` inside field text
   (pkjs strips them).
@@ -83,14 +87,14 @@ adding/removing keys: `THREADS`, `THREAD_ID`, `THREAD_DETAIL`,
   `settings.scrubClaySecrets()` removes it from Clay's persisted settings so it
   doesn't leak into the config page roundtrip. Preserve this behavior.
 - **pkjs runs in the phone's JS sandbox** — use `XMLHttpRequest` (no fetch),
-  CommonJS `require`, and defensive `typeof console` checks. Watch-side JS is
-  Moddable XS with Piu globals (`Application`, `Skin`, `Style`, `Label`,
-  `Container`, `Behavior`) and helpers like `Math.idiv` and `screen`.
-- **The watch list UI is 5 fixed rows** (`ROW0`–`ROW4` anchors), not a virtual
-  list. Scrolling works by shifting `firstVisibleIndex` / `detailOffset`.
+  CommonJS `require`, and defensive `typeof console` checks.
+- **The watch UI is native C** — avoid heap-heavy patterns. Prefer fixed-size
+  static buffers, bounded copies, one custom drawing layer, and explicit
+  AppMessage parsing.
+- **The watch list UI is 5 fixed rows**, not a virtual list. Scrolling works by
+  shifting `s_first_visible_index` / `s_detail_offset`.
 - **Round display (gabbro)** is a target platform; avoid layout assumptions
-  that only hold for rectangular screens. Primary target platform is 'emory'
-  though!
+  that only hold for rectangular screens. Primary target platform is **emery**.
 - **documentation** When writing any notes or docs, always write them into the
   docs/ directory and date your markdown files by prefixing them with todays
   date in the format of YYYY-MM-DD, i.e. '2026-06-23-http-client-fixes.md'.
