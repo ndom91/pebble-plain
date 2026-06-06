@@ -43,7 +43,7 @@ Initial public release. Shows Plain TODO threads, thread details, and recent mes
 - Store icon source: `assets/icon.png`
 - Store small icon: `assets/store-icon-small.png`
 - Store large icon: `assets/store-icon-large.png`
-- Store screenshots: capture at least one `emery_*.png`; add `gabbro_*.png` if using `--all-platforms` or uploading screenshots manually.
+- Store screenshots: put screenshots in `screenshots/`. Filenames must start with the platform name, for example `screenshots/emery_thread-list.png` or `screenshots/gabbro_thread-list.png`.
 
 Set `--source` to the public repository URL after the repository exists.
 
@@ -58,7 +58,21 @@ pebble install --emulator gabbro
 
 ## Publish Command
 
-Interactive upload:
+The publish script reads the app name, version, and source URL from
+`package.json` and accepts screenshot paths as arguments:
+
+```sh
+pebble login
+./scripts/publish.sh
+```
+
+Override dynamic values with environment variables if needed:
+
+```sh
+APP_VERSION=1.0.1 RELEASE_NOTES="Bug fixes." ./scripts/publish.sh
+```
+
+Interactive upload without the script:
 
 ```sh
 pebble login

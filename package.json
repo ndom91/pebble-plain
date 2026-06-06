@@ -3,6 +3,10 @@
   "description": "View Plain TODO support threads, details, and recent messages on Pebble.",
   "author": "ndom91",
   "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ndom91/pebble-plain"
+  },
   "keywords": [
     "pebble-app",
     "plain",

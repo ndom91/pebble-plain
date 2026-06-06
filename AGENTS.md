@@ -98,6 +98,7 @@ usage, and PKJS payload names in sync when adding/removing keys: `THREADS`,
 - **documentation** When writing any notes or docs, always write them into the
   docs/ directory and date your markdown files by prefixing them with todays
   date in the format of YYYY-MM-DD, i.e. '2026-06-23-http-client-fixes.md'.
+- **pnpm** We always use 'pnpm' as the root package manager. NEVER use 'npm'
 
 ## Configuration
 
