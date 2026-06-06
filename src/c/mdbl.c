@@ -18,7 +18,7 @@
 #define OUTBOX_SIZE 128
 #define MARQUEE_INTERVAL_MS 650
 #define MARQUEE_PAUSE_TICKS 1
-#define LIST_MARQUEE_WINDOW 30
+#define LIST_MARQUEE_WINDOW 24
 #define DETAIL_MARQUEE_WINDOW 30
 #define FIELD_SEPARATOR '\x1f'
 #define RECORD_SEPARATOR '\x1e'
@@ -439,14 +439,17 @@ static void draw_list_row(GContext *ctx, GRect row_frame, GRect content_frame, i
   }
 
   char row_text[REF_LEN + TITLE_LEN + 2];
+  GRect label_frame = GRect(content_frame.origin.x + 6, content_frame.origin.y + 6, content_frame.size.w - 42, content_frame.size.h - 6);
+  GRect chevron_frame = GRect(content_frame.origin.x + content_frame.size.w - 30, content_frame.origin.y + 6, 22, content_frame.size.h - 6);
   snprintf(row_text, sizeof(row_text), "%s %s", s_threads[thread_index].ref, s_threads[thread_index].title);
   if (selected) {
     char marquee_row_text[REF_LEN + TITLE_LEN + 2];
     marquee_text(row_text, marquee_row_text, sizeof(marquee_row_text), LIST_MARQUEE_WINDOW);
-    draw_text(ctx, marquee_row_text, s_list_font, GRect(content_frame.origin.x + 6, content_frame.origin.y + 6, content_frame.size.w - 12, content_frame.size.h - 6), GTextAlignmentLeft);
-    return;
+    draw_text(ctx, marquee_row_text, s_list_font, label_frame, GTextAlignmentLeft);
+  } else {
+    draw_text(ctx, row_text, s_list_font, label_frame, GTextAlignmentLeft);
   }
-  draw_text(ctx, row_text, s_list_font, GRect(content_frame.origin.x + 6, content_frame.origin.y + 6, content_frame.size.w - 12, content_frame.size.h - 6), GTextAlignmentLeft);
+  draw_text(ctx, ">", s_list_font, chevron_frame, GTextAlignmentRight);
 }
 
 static void draw_detail_row(GContext *ctx, GRect row_frame, GRect content_frame, int detail_index, bool selected) {
