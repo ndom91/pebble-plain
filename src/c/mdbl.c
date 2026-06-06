@@ -14,6 +14,10 @@
 #define PENDING_ID_LEN 4
 #define INBOX_SIZE 1152
 #define OUTBOX_SIZE 128
+#define MARQUEE_INTERVAL_MS 650
+#define MARQUEE_PAUSE_TICKS 1
+#define LIST_MARQUEE_WINDOW 30
+#define DETAIL_MARQUEE_WINDOW 30
 #define FIELD_SEPARATOR '\x1f'
 #define RECORD_SEPARATOR '\x1e'
 
@@ -34,6 +38,7 @@ typedef struct {
 
 static Window *s_window;
 static Layer *s_canvas_layer;
+static AppTimer *s_marquee_timer;
 static GFont s_header_font;
 static GFont s_list_font;
 static GFont s_detail_key_font;
@@ -51,6 +56,8 @@ static int s_selected_index;
 static int s_first_visible_index;
 static int s_detail_selected_index;
 static int s_detail_offset;
+static int s_marquee_index;
+static int s_marquee_pause;
 
 static GColor accent_color(void) {
   return PBL_IF_COLOR_ELSE(GColorFromRGB(0x55, 0xd6, 0xbe), GColorWhite);
@@ -82,6 +89,63 @@ static void mark_dirty(void) {
   if (s_canvas_layer) {
     layer_mark_dirty(s_canvas_layer);
   }
+}
+
+static void reset_marquee(void) {
+  s_marquee_index = 0;
+  s_marquee_pause = MARQUEE_PAUSE_TICKS;
+}
+
+static bool selected_text_overflows(void) {
+  if (s_view == ViewList && s_thread_count > 0) {
+    ThreadRow *row = &s_threads[s_selected_index];
+    return (int)(strlen(row->ref) + 1 + strlen(row->title)) > LIST_MARQUEE_WINDOW;
+  }
+
+  if (s_view == ViewDetail && s_detail_count > 0) {
+    return (int)strlen(s_detail_rows[s_detail_selected_index].value) > DETAIL_MARQUEE_WINDOW;
+  }
+
+  return false;
+}
+
+static void marquee_text(const char *text, char *dest, size_t dest_size, int window) {
+  int text_length = strlen(text);
+  if (text_length <= window) {
+    copy_text(dest, dest_size, text);
+    return;
+  }
+
+  int gap_length = 3;
+  int loop_length = text_length + gap_length;
+  int start = s_marquee_index % loop_length;
+  int limit = window < (int)dest_size - 1 ? window : (int)dest_size - 1;
+
+  for (int i = 0; i < limit; i += 1) {
+    int position = (start + i) % loop_length;
+    if (position < text_length) {
+      dest[i] = text[position];
+    } else {
+      dest[i] = ' ';
+    }
+  }
+  dest[limit] = '\0';
+}
+
+static void marquee_timer_callback(void *context) {
+  s_marquee_timer = NULL;
+  if (selected_text_overflows()) {
+    if (s_marquee_pause > 0) {
+      s_marquee_pause -= 1;
+    } else {
+      s_marquee_index += 1;
+      mark_dirty();
+    }
+  } else {
+    reset_marquee();
+  }
+
+  s_marquee_timer = app_timer_register(MARQUEE_INTERVAL_MS, marquee_timer_callback, NULL);
 }
 
 static int row_content_inset(int visible_row) {
@@ -168,6 +232,7 @@ static void clamp_detail_selection(void) {
 static void render_error(const char *message) {
   s_view = ViewList;
   s_pending_thread_index[0] = '\0';
+  reset_marquee();
   s_thread_count = 0;
   s_detail_count = 0;
   s_selected_index = 0;
@@ -182,6 +247,7 @@ static void render_detail_error(const char *message) {
   s_detail_count = 0;
   s_detail_selected_index = 0;
   s_detail_offset = 0;
+  reset_marquee();
   copy_text(s_status, sizeof(s_status), "Thread detail");
   copy_text(s_empty_text, sizeof(s_empty_text), message);
   mark_dirty();
@@ -194,6 +260,7 @@ static void parse_threads(const char *payload) {
   s_first_visible_index = 0;
   s_view = ViewList;
   s_pending_thread_index[0] = '\0';
+  reset_marquee();
   copy_text(s_status, sizeof(s_status), "TODO");
   copy_text(s_empty_text, sizeof(s_empty_text), "No TODO threads");
 
@@ -228,6 +295,7 @@ static void parse_detail(const char *payload) {
   s_detail_count = 0;
   s_detail_selected_index = 0;
   s_detail_offset = 0;
+  reset_marquee();
   copy_text(s_status, sizeof(s_status), status);
   copy_text(s_empty_text, sizeof(s_empty_text), "No detail lines");
 
@@ -298,6 +366,12 @@ static void draw_list_row(GContext *ctx, GRect row_frame, GRect content_frame, i
 
   char row_text[REF_LEN + TITLE_LEN + 2];
   snprintf(row_text, sizeof(row_text), "%s %s", s_threads[thread_index].ref, s_threads[thread_index].title);
+  if (selected) {
+    char marquee_row_text[REF_LEN + TITLE_LEN + 2];
+    marquee_text(row_text, marquee_row_text, sizeof(marquee_row_text), LIST_MARQUEE_WINDOW);
+    draw_text(ctx, marquee_row_text, s_list_font, GRect(content_frame.origin.x + 6, content_frame.origin.y + 6, content_frame.size.w - 12, content_frame.size.h - 6), GTextAlignmentLeft);
+    return;
+  }
   draw_text(ctx, row_text, s_list_font, GRect(content_frame.origin.x + 6, content_frame.origin.y + 6, content_frame.size.w - 12, content_frame.size.h - 6), GTextAlignmentLeft);
 }
 
@@ -313,8 +387,13 @@ static void draw_detail_row(GContext *ctx, GRect row_frame, GRect content_frame,
   DetailRow *row = &s_detail_rows[detail_index];
   GRect key_frame = GRect(content_frame.origin.x + 8, content_frame.origin.y + 3, content_frame.size.w - 14, 16);
   GRect value_frame = GRect(content_frame.origin.x + 8, content_frame.origin.y + 19, content_frame.size.w - 14, content_frame.size.h - 18);
+  char value_text[DETAIL_VALUE_LEN];
+  copy_text(value_text, sizeof(value_text), row->value);
+  if (selected) {
+    marquee_text(row->value, value_text, sizeof(value_text), DETAIL_MARQUEE_WINDOW);
+  }
   draw_text(ctx, row->key, s_detail_key_font, key_frame, GTextAlignmentLeft);
-  draw_text(ctx, row->value, s_detail_value_font, value_frame, GTextAlignmentLeft);
+  draw_text(ctx, value_text, s_detail_value_font, value_frame, GTextAlignmentLeft);
 }
 
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
@@ -361,6 +440,7 @@ static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
     s_selected_index -= 1;
     clamp_list_selection();
   }
+  reset_marquee();
   mark_dirty();
 }
 
@@ -372,6 +452,7 @@ static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
     s_selected_index += 1;
     clamp_list_selection();
   }
+  reset_marquee();
   mark_dirty();
 }
 
@@ -384,6 +465,7 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
   s_detail_count = 0;
   s_detail_selected_index = 0;
   s_detail_offset = 0;
+  reset_marquee();
   snprintf(s_pending_thread_index, sizeof(s_pending_thread_index), "%d", s_selected_index);
   copy_text(s_status, sizeof(s_status), s_threads[s_selected_index].ref);
   copy_text(s_empty_text, sizeof(s_empty_text), "Loading detail...");
@@ -395,6 +477,7 @@ static void back_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (s_view == ViewDetail) {
     s_view = ViewList;
     s_pending_thread_index[0] = '\0';
+    reset_marquee();
     mark_dirty();
   } else {
     window_stack_pop(true);
@@ -466,6 +549,8 @@ static void init(void) {
   app_message_register_inbox_dropped(inbox_dropped_callback);
   app_message_register_outbox_failed(outbox_failed_callback);
   app_message_open(INBOX_SIZE, OUTBOX_SIZE);
+  reset_marquee();
+  s_marquee_timer = app_timer_register(MARQUEE_INTERVAL_MS, marquee_timer_callback, NULL);
 
   s_window = window_create();
   window_set_background_color(s_window, background_color());
@@ -478,6 +563,9 @@ static void init(void) {
 }
 
 static void deinit(void) {
+  if (s_marquee_timer) {
+    app_timer_cancel(s_marquee_timer);
+  }
   app_message_deregister_callbacks();
   window_destroy(s_window);
 }
