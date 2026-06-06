@@ -1,6 +1,8 @@
+![](./assets/icon.png)
+
 # Plain Pebble
 
-A Pebble watchapp that shows Plain TODO support threads, details, and recent
+A Pebble watchapp that shows Plain support threads, details, and recent
 messages on the watch.
 
 The watch UI is native Pebble C. The phone companion is PebbleKit JS and owns
@@ -21,10 +23,14 @@ Open the app settings in the Pebble/Rebble phone app and enter a Plain machine
 user API key. The key is stored by PebbleKit JS on the phone and is not sent to
 the watch.
 
+You can generate a machine user key in Plain under Settings → API → Machine
+users. The key needs `threads:read` scope to show threads and `messages:read`
+scope to show recent messages.
+
 ## Target platforms
 
 The app targets modern Pebble hardware: **emery** (Pebble Time 2) and
-**gabbro** (Pebble Round 2). Other platforms are currently not supported.
+**gabbro** (Pebble Round 2). Other platforms are currently not officially supported.
 
 ## Project layout
 
@@ -38,15 +44,6 @@ package.json                   Project metadata (UUID, platforms, resources)
 wscript                        Build rules — usually no need to edit
 ```
 
-## Migration Notes
+## License
 
-The watch UI used to run on Moddable/Piu. It was migrated to native C to avoid
-startup heap pressure from the JavaScript runtime and Piu object tree. See
-`docs/2026-06-06-migrate-to-c-plan.md` for the migration rationale and plan.
-
-## Documentation
-
-Full SDK docs and tutorials: <https://developer.repebble.com>
-
-For app-store release notes, listing copy, and upload commands, see
-`docs/2026-06-06-app-store-publish-checklist.md`.
+MIT

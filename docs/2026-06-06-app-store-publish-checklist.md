@@ -8,7 +8,7 @@
 - Type: watchapp, not watchface
 - Target platforms: `emery`, `gabbro`
 - Capabilities: configurable
-- Category: productivity
+- Category: tools
 
 Before making the repository public, choose and add a license. Do not publish
 with an accidental implied license.
@@ -87,7 +87,7 @@ pebble publish --non-interactive \
   --name "Plain" \
   --version "1.0.0" \
   --description "Plain for Pebble shows your Plain TODO support threads on the watch, including thread references, titles, customer metadata, labels, assignees, and recent messages. Requires a Plain machine-user API key configured from the Pebble/Rebble phone app. The API key is stored on the phone and is not sent to the watch." \
-  --category productivity \
+  --category tools \
   --source "<public-repository-url>" \
   --icon-small assets/store-icon-small.png \
   --icon-large assets/store-icon-large.png \

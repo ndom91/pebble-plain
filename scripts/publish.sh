@@ -9,7 +9,7 @@ read_package_json() {
 APP_NAME="${APP_NAME:-$(read_package_json "p.pebble.displayName")}"
 APP_VERSION="${APP_VERSION:-$(read_package_json "p.version")}"
 APP_DESCRIPTION="${APP_DESCRIPTION:-Plain for Pebble shows your Plain TODO support threads on the watch, including thread references, titles, customer metadata, labels, assignees, and recent messages. Requires a Plain machine-user API key configured from the Pebble/Rebble phone app. The API key is stored on the phone and is not sent to the watch.}"
-APP_CATEGORY="${APP_CATEGORY:-productivity}"
+APP_CATEGORY="${APP_CATEGORY:-tools}"
 SOURCE_URL="${SOURCE_URL:-$(read_package_json "p.repository && p.repository.url || ''")}"
 RELEASE_NOTES="${RELEASE_NOTES:-Initial public release. Shows Plain TODO threads, thread details, and recent messages with native Pebble navigation and phone-side API-key configuration.}"
 
@@ -17,6 +17,14 @@ if [ -z "$SOURCE_URL" ]; then
   printf 'SOURCE_URL is required, for example:\n  SOURCE_URL=https://github.com/<owner>/<repo> %s screenshots/emery.png\n' "$0" >&2
   exit 1
 fi
+
+case "$APP_CATEGORY" in
+  daily|tools|notifications|remotes|health|games) ;;
+  *)
+    printf 'Invalid APP_CATEGORY: %s\nValid categories: daily, tools, notifications, remotes, health, games\n' "$APP_CATEGORY" >&2
+    exit 1
+    ;;
+esac
 
 if [ "$#" -gt 0 ]; then
   screenshots=("$@")
