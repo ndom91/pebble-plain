@@ -30,12 +30,12 @@ if [ "$#" -gt 0 ]; then
   screenshots=("$@")
 else
   shopt -s nullglob
-  screenshots=(screenshots/*.png screenshots/*.gif)
+  screenshots=(assets/screenshots/*.png assets/screenshots/*.gif)
   shopt -u nullglob
 fi
 
 if [ "${#screenshots[@]}" -eq 0 ]; then
-  printf 'No screenshots found. Add PNG or GIF files to screenshots/, or pass screenshot paths explicitly.\n' >&2
+  printf 'No screenshots found. Add PNG or GIF files to assets/screenshots/, or pass screenshot paths explicitly.\n' >&2
   exit 1
 fi
 

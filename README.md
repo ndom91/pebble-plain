@@ -21,13 +21,13 @@ The watch UI is native Pebble C. The phone companion is PebbleKit JS and owns Pl
   <tbody>
     <tr>
       <td>
-        <img src="screenshots/emery_thread-list.png" alt="thread list" />
+        <img src="assets/screenshots/emery_thread-list.png" alt="thread list" />
       </td>
       <td>
-        <img src="screenshots/emery_thread-detail.png" alt="thread details" />
+        <img src="assets/screenshots/emery_thread-detail.png" alt="thread details" />
       </td>
       <td>
-        <img src="screenshots/emery_thread-messages.png" alt="thread messages" />
+        <img src="assets/screenshots/emery_thread-messages.png" alt="thread messages" />
       </td>
     </tr>
   </tbody>
