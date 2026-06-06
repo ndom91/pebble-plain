@@ -46,6 +46,10 @@ When taking screenshots, wait a bit after launching the emulator. If the
 launcher is shown instead of the app, press right/select a few times to launch
 the `Plain` app before capturing the screenshot.
 
+You can find the Pebble SDK docs at: https://developer.repebble.com/docs/
+
+You should double check there first if you're unsure about anything.
+
 ## Architecture & data flow
 
 1. **Phone (pkjs)** — on `ready`, `index.js` fetches up to 10 TODO threads from
