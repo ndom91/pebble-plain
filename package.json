@@ -32,13 +32,9 @@
       "watchface": false
     },
     "messageKeys": [
-      "THREADS_START",
-      "THREAD_LINE",
-      "THREADS_DONE",
+      "THREADS",
       "THREAD_ID",
-      "THREAD_DETAIL_START",
-      "THREAD_DETAIL_LINE",
-      "THREAD_DETAIL_DONE",
+      "THREAD_DETAIL",
       "THREAD_DETAIL_ERROR",
       "ERROR",
       "PLAIN_API_KEY",

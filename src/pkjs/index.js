@@ -6,6 +6,12 @@ const settings = require("./settings");
 
 const clay = new Clay(clayConfig, null, { autoHandleEvents: false });
 let threadIds = [];
+const FIELD_SEPARATOR = "\x1f";
+const RECORD_SEPARATOR = "\x1e";
+
+function messageText(value) {
+	return plain.shorten(value, 100).replace(/[\x1e\x1f]/g, " ");
+}
 
 function sendToWatch(payload) {
 	const onFailure = function (error) {
@@ -27,7 +33,7 @@ function sendError(message) {
 }
 
 function sendThreadDetailError(threadId, message) {
-	sendToWatch({ THREAD_DETAIL_ERROR: threadId + "\n" + plain.shorten(message, 120) });
+	sendToWatch({ THREAD_DETAIL_ERROR: threadId + FIELD_SEPARATOR + messageText(message) });
 }
 
 function detailLines(detail) {
@@ -59,14 +65,16 @@ function detailLines(detail) {
 }
 
 function sendThreadDetail(threadIndexText, detail) {
-	sendToWatch({ THREAD_DETAIL_START: threadIndexText + "\n" + detail.ref + " " + detail.status + " " + detail.priorityLabel });
-
+	const records = [
+		threadIndexText,
+		messageText(detail.ref + " " + detail.status + " " + detail.priorityLabel),
+	];
 	const lines = detailLines(detail);
 	for (let i = 0; i < lines.length; i += 1) {
-		sendToWatch({ THREAD_DETAIL_LINE: threadIndexText + "\n" + lines[i] });
+		records.push(messageText(lines[i]));
 	}
 
-	sendToWatch({ THREAD_DETAIL_DONE: threadIndexText });
+	sendToWatch({ THREAD_DETAIL: records.join(RECORD_SEPARATOR) });
 }
 
 function configuredApiKey(onMissing) {
@@ -93,15 +101,15 @@ function fetchTodoThreads() {
 	}
 
 	plain.fetchTodoThreads(apiKey, function (threads) {
+		const records = [];
 		threadIds = [];
-		sendToWatch({ THREADS_START: "1" });
 
 		for (let i = 0; i < threads.length; i += 1) {
 			threadIds.push(threads[i].id);
-			sendToWatch({ THREAD_LINE: threads[i].ref + "\n" + threads[i].title });
+			records.push(messageText(threads[i].ref) + FIELD_SEPARATOR + messageText(threads[i].title));
 		}
 
-		sendToWatch({ THREADS_DONE: "1" });
+		sendToWatch({ THREADS: records.join(RECORD_SEPARATOR) });
 	}, sendError);
 }
 

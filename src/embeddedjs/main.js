@@ -7,6 +7,8 @@ const ROW_HEIGHT = Math.idiv(screen.height - HEADER_HEIGHT, ROW_COUNT);
 const TITLE_WINDOW = 30;
 const TITLE_SCROLL_INTERVAL = 650;
 const TITLE_SCROLL_PAUSE_TICKS = 1;
+const FIELD_SEPARATOR = "\x1f";
+const RECORD_SEPARATOR = "\x1e";
 let suppressBackRelease = false;
 
 const backgroundSkin = new Skin({ fill: "#071018" });
@@ -348,7 +350,7 @@ function renderDetailLoading(thread, threadIndex) {
 
 function splitScopedMessage(payload) {
 	const text = String(payload);
-	const separator = text.indexOf("\n");
+	const separator = text.indexOf(FIELD_SEPARATOR);
 	if (separator < 0) {
 		return { threadId: text, text: "" };
 	}
@@ -359,9 +361,9 @@ function splitScopedMessage(payload) {
 	};
 }
 
-function renderDetailStart(payload) {
-	const message = splitScopedMessage(payload);
-	if (message.threadId !== detailThreadId) {
+function renderDetail(payload) {
+	const records = String(payload).split(RECORD_SEPARATOR);
+	if (records.length < 2 || records[0] !== detailThreadId) {
 		return;
 	}
 
@@ -369,28 +371,11 @@ function renderDetailStart(payload) {
 	detailOffset = 0;
 	detailSelectedIndex = 0;
 	resetTitleScroll();
-	model.STATUS.string = message.text;
-	detailLines = [];
-
-	renderDetailRows();
-}
-
-function renderDetailLine(payload) {
-	const message = splitScopedMessage(payload);
-	if (message.threadId !== detailThreadId) {
-		return;
+	model.STATUS.string = records[1];
+	detailLines = records.slice(2);
+	if (detailLines.length === 0) {
+		detailLines = ["No detail lines"];
 	}
-
-	detailLines.push(message.text);
-	renderDetailRows();
-}
-
-function renderDetailDone(threadId) {
-	if (String(threadId) !== detailThreadId || detailLines.length !== 0) {
-		return;
-	}
-
-	detailLines = ["No detail lines"];
 	renderDetailRows();
 }
 
@@ -447,39 +432,6 @@ function renderRows() {
 			title.string = state === 1 ? marqueeText(text) : shorten(text, TITLE_WINDOW);
 		}
 	}
-}
-
-function renderThreadsLoading() {
-	view = "list";
-	detailThreadId = null;
-	detailLines = [];
-	detailOffset = 0;
-	detailSelectedIndex = 0;
-	threads = [];
-	selectedIndex = 0;
-	firstVisibleIndex = 0;
-	resetTitleScroll();
-	model.SPLASH.visible = false;
-	model.STATUS.visible = true;
-	model.STATUS.string = "Loading TODO...";
-
-	for (let i = 0; i < ROW_COUNT; i += 1) {
-		const row = getRow(i);
-		const title = getTitle(i);
-		row.visible = false;
-		row.state = 0;
-		title.style = rowStyle;
-		title.state = 0;
-		title.string = "";
-	}
-}
-
-function addThreadLine(payload) {
-	const thread = splitScopedMessage(payload);
-	threads.push({
-		ref: thread.threadId,
-		title: thread.text,
-	});
 }
 
 function moveSelection(delta) {
@@ -552,17 +504,13 @@ function renderError(message) {
 
 const messages = new Message({
 	keys: [
-		"THREADS_START",
-		"THREAD_LINE",
-		"THREADS_DONE",
+		"THREADS",
 		"THREAD_ID",
-		"THREAD_DETAIL_START",
-		"THREAD_DETAIL_LINE",
-		"THREAD_DETAIL_DONE",
+		"THREAD_DETAIL",
 		"THREAD_DETAIL_ERROR",
 		"ERROR",
 	],
-	input: 768,
+	input: 1536,
 	output: 128,
 	onReadable() {
 		const msg = this.read();
@@ -581,38 +529,24 @@ const messages = new Message({
 			return;
 		}
 
-		const detailStartPayload = msg.get("THREAD_DETAIL_START");
-		if (detailStartPayload !== undefined) {
-			renderDetailStart(detailStartPayload);
+		const detailPayload = msg.get("THREAD_DETAIL");
+		if (detailPayload !== undefined) {
+			renderDetail(detailPayload);
 			return;
 		}
 
-		const detailLinePayload = msg.get("THREAD_DETAIL_LINE");
-		if (detailLinePayload !== undefined) {
-			renderDetailLine(detailLinePayload);
-			return;
-		}
-
-		const detailDonePayload = msg.get("THREAD_DETAIL_DONE");
-		if (detailDonePayload !== undefined) {
-			renderDetailDone(detailDonePayload);
-			return;
-		}
-
-		const threadsStartPayload = msg.get("THREADS_START");
-		if (threadsStartPayload !== undefined) {
-			renderThreadsLoading();
-			return;
-		}
-
-		const threadLinePayload = msg.get("THREAD_LINE");
-		if (threadLinePayload !== undefined) {
-			addThreadLine(threadLinePayload);
-			return;
-		}
-
-		const threadsDonePayload = msg.get("THREADS_DONE");
-		if (threadsDonePayload !== undefined) {
+		const threadPayload = msg.get("THREADS");
+		if (threadPayload !== undefined) {
+			const records = String(threadPayload).split(RECORD_SEPARATOR);
+			threads = [];
+			for (let i = 0; i < records.length; i += 1) {
+				const thread = splitScopedMessage(records[i]);
+				if (thread.threadId !== "") {
+					threads.push({ ref: thread.threadId, title: thread.text });
+				}
+			}
+			selectedIndex = 0;
+			firstVisibleIndex = 0;
 			renderRows();
 			return;
 		}
