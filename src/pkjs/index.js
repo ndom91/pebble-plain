@@ -27,12 +27,46 @@ function sendError(message) {
 }
 
 function sendThreadDetailError(threadId, message) {
-	sendToWatch({
-		THREAD_DETAIL_ERROR: JSON.stringify({
-			threadId: threadId,
-			message: plain.shorten(message, 120),
-		}),
-	});
+	sendToWatch({ THREAD_DETAIL_ERROR: threadId + "\n" + plain.shorten(message, 120) });
+}
+
+function detailLines(detail) {
+	const lines = [detail.title];
+
+	if (detail.customer !== "") {
+		lines.push("From " + detail.customer);
+	}
+	if (detail.updatedAt !== "") {
+		lines.push("Updated " + detail.updatedAt);
+	}
+
+	if (detail.description !== "") {
+		lines.push(detail.description);
+	} else if (detail.previewText !== "") {
+		lines.push(detail.previewText);
+	}
+
+	if (detail.messages.length === 0) {
+		lines.push("No messages");
+	} else {
+		lines.push("Messages");
+		for (let i = 0; i < detail.messages.length; i += 1) {
+			lines.push(detail.messages[i]);
+		}
+	}
+
+	return lines;
+}
+
+function sendThreadDetail(threadIndexText, detail) {
+	sendToWatch({ THREAD_DETAIL_START: threadIndexText + "\n" + detail.ref + " " + detail.status + " " + detail.priorityLabel });
+
+	const lines = detailLines(detail);
+	for (let i = 0; i < lines.length; i += 1) {
+		sendToWatch({ THREAD_DETAIL_LINE: threadIndexText + "\n" + lines[i] });
+	}
+
+	sendToWatch({ THREAD_DETAIL_DONE: threadIndexText });
 }
 
 function configuredApiKey(onMissing) {
@@ -90,8 +124,7 @@ function fetchThreadDetail(threadIndexText) {
 	}
 
 	plain.fetchThreadDetail(apiKey, threadId, function (detail) {
-		detail.threadId = threadIndexText;
-		sendToWatch({ THREAD_DETAIL: JSON.stringify(detail) });
+		sendThreadDetail(threadIndexText, detail);
 	}, function (message) {
 		sendThreadDetailError(threadIndexText, message);
 	});

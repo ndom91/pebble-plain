@@ -346,8 +346,22 @@ function renderDetailLoading(thread, threadIndex) {
 	renderDetailRows();
 }
 
-function renderDetail(detail) {
-	if (detail.threadId !== detailThreadId) {
+function splitScopedMessage(payload) {
+	const text = String(payload);
+	const separator = text.indexOf("\n");
+	if (separator < 0) {
+		return { threadId: text, text: "" };
+	}
+
+	return {
+		threadId: text.slice(0, separator),
+		text: text.slice(separator + 1),
+	};
+}
+
+function renderDetailStart(payload) {
+	const message = splitScopedMessage(payload);
+	if (message.threadId !== detailThreadId) {
 		return;
 	}
 
@@ -355,31 +369,28 @@ function renderDetail(detail) {
 	detailOffset = 0;
 	detailSelectedIndex = 0;
 	resetTitleScroll();
-	model.STATUS.string = `${detail.ref} ${detail.status} ${detail.priorityLabel}`;
-	detailLines = [detail.title];
+	model.STATUS.string = message.text;
+	detailLines = [];
 
-	if (detail.customer !== "") {
-		detailLines.push(`From ${detail.customer}`);
-	}
-	if (detail.updatedAt !== "") {
-		detailLines.push(`Updated ${detail.updatedAt}`);
-	}
+	renderDetailRows();
+}
 
-	if (detail.description !== "") {
-		detailLines.push(detail.description);
-	} else if (detail.previewText !== "") {
-		detailLines.push(detail.previewText);
+function renderDetailLine(payload) {
+	const message = splitScopedMessage(payload);
+	if (message.threadId !== detailThreadId) {
+		return;
 	}
 
-	if (detail.messages.length === 0) {
-		detailLines.push("No messages");
-	} else {
-		detailLines.push("Messages");
-		for (let i = 0; i < detail.messages.length; i += 1) {
-			detailLines.push(detail.messages[i]);
-		}
+	detailLines.push(message.text);
+	renderDetailRows();
+}
+
+function renderDetailDone(threadId) {
+	if (String(threadId) !== detailThreadId || detailLines.length !== 0) {
+		return;
 	}
 
+	detailLines = ["No detail lines"];
 	renderDetailRows();
 }
 
@@ -510,7 +521,9 @@ const messages = new Message({
 	keys: [
 		"THREADS",
 		"THREAD_ID",
-		"THREAD_DETAIL",
+		"THREAD_DETAIL_START",
+		"THREAD_DETAIL_LINE",
+		"THREAD_DETAIL_DONE",
 		"THREAD_DETAIL_ERROR",
 		"ERROR",
 	],
@@ -526,24 +539,28 @@ const messages = new Message({
 
 		const detailErrorPayload = msg.get("THREAD_DETAIL_ERROR");
 		if (detailErrorPayload !== undefined) {
-			try {
-				const detailError = JSON.parse(detailErrorPayload);
-				if (view === "detail" && detailError.threadId === detailThreadId) {
-					renderDetailError(detailError.message);
-				}
-			} catch (e) {
-				renderError(String(e));
+			const detailError = splitScopedMessage(detailErrorPayload);
+			if (view === "detail" && detailError.threadId === detailThreadId) {
+				renderDetailError(detailError.text);
 			}
 			return;
 		}
 
-		const detailPayload = msg.get("THREAD_DETAIL");
-		if (detailPayload !== undefined) {
-			try {
-				renderDetail(JSON.parse(detailPayload));
-			} catch (e) {
-				renderError(String(e));
-			}
+		const detailStartPayload = msg.get("THREAD_DETAIL_START");
+		if (detailStartPayload !== undefined) {
+			renderDetailStart(detailStartPayload);
+			return;
+		}
+
+		const detailLinePayload = msg.get("THREAD_DETAIL_LINE");
+		if (detailLinePayload !== undefined) {
+			renderDetailLine(detailLinePayload);
+			return;
+		}
+
+		const detailDonePayload = msg.get("THREAD_DETAIL_DONE");
+		if (detailDonePayload !== undefined) {
+			renderDetailDone(detailDonePayload);
 			return;
 		}
 
