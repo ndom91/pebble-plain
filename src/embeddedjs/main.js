@@ -7,8 +7,6 @@ const ROW_HEIGHT = Math.idiv(screen.height - HEADER_HEIGHT, ROW_COUNT);
 const TITLE_WINDOW = 30;
 const TITLE_SCROLL_INTERVAL = 650;
 const TITLE_SCROLL_PAUSE_TICKS = 1;
-const DETAIL_BUFFER_BEFORE = 1;
-const DETAIL_PAGE_SIZE = ROW_COUNT + DETAIL_BUFFER_BEFORE + 2;
 let suppressBackRelease = false;
 
 const backgroundSkin = new Skin({ fill: "#071018" });
@@ -49,9 +47,6 @@ let firstVisibleIndex = 0;
 let view = "list";
 let detailThreadId = null;
 let detailLines = [];
-let detailLineStart = 0;
-let detailLineCount = 0;
-let detailRequestedStart = -1;
 let detailOffset = 0;
 let detailSelectedIndex = 0;
 let titleScrollIndex = 0;
@@ -294,7 +289,7 @@ function renderSelectedTitle() {
 		return;
 	}
 
-	getTitle(rowIndex).string = marqueeText(getDetailLine(detailSelectedIndex));
+	getTitle(rowIndex).string = marqueeText(detailLines[detailSelectedIndex]);
 }
 
 function advanceTitleScroll() {
@@ -302,8 +297,8 @@ function advanceTitleScroll() {
 
 	if (view === "list" && threads.length !== 0) {
 		text = formatThread(threads[selectedIndex]);
-	} else if (view === "detail" && detailLineCount !== 0) {
-		text = getDetailLine(detailSelectedIndex);
+	} else if (view === "detail" && detailLines.length !== 0) {
+		text = detailLines[detailSelectedIndex];
 	} else {
 		return;
 	}
@@ -321,51 +316,6 @@ function advanceTitleScroll() {
 	renderSelectedTitle();
 }
 
-function getDetailLine(lineIndex) {
-	const localIndex = lineIndex - detailLineStart;
-	if (localIndex < 0 || localIndex >= detailLines.length) {
-		return "Loading...";
-	}
-
-	return detailLines[localIndex] === undefined ? "Loading..." : detailLines[localIndex];
-}
-
-function requestDetailPage(start) {
-	if (detailThreadId === null || start === detailRequestedStart || start === detailLineStart) {
-		return;
-	}
-
-	detailRequestedStart = start;
-	const request = new Map();
-	request.set("THREAD_DETAIL_PAGE", detailThreadId + "\n" + start);
-	messages.write(request);
-}
-
-function ensureDetailBuffer() {
-	if (detailLineCount === 0) {
-		return;
-	}
-
-	const visibleStart = detailOffset;
-	const visibleEnd = Math.min(detailLineCount - 1, detailOffset + ROW_COUNT - 1);
-	const loadedEnd = detailLineStart + detailLines.length - 1;
-	if (visibleStart >= detailLineStart && visibleEnd <= loadedEnd) {
-		return;
-	}
-
-	let start = visibleStart - DETAIL_BUFFER_BEFORE;
-	if (start < 0) {
-		start = 0;
-	}
-
-	const maxStart = Math.max(0, detailLineCount - DETAIL_PAGE_SIZE);
-	if (start > maxStart) {
-		start = maxStart;
-	}
-
-	requestDetailPage(start);
-}
-
 function renderDetailRows() {
 	model.SPLASH.visible = false;
 	model.STATUS.visible = true;
@@ -374,24 +324,20 @@ function renderDetailRows() {
 		const lineIndex = detailOffset + i;
 		const row = getRow(i);
 		const title = getTitle(i);
-		const visible = lineIndex < detailLineCount;
+		const visible = lineIndex < detailLines.length;
 		const active = visible && lineIndex === detailSelectedIndex;
-		const text = visible ? getDetailLine(lineIndex) : "";
 
 		row.visible = visible;
 		row.state = active ? 1 : 0;
 		title.style = detailStyle;
 		title.state = row.state;
-		title.string = visible ? (active ? marqueeText(text) : shorten(text, TITLE_WINDOW)) : "";
+		title.string = visible ? (active ? marqueeText(detailLines[lineIndex]) : shorten(detailLines[lineIndex], TITLE_WINDOW)) : "";
 	}
 }
 
 function renderDetailLoading(thread, threadIndex) {
 	view = "detail";
 	detailThreadId = threadIndex;
-	detailLineStart = 0;
-	detailLineCount = 1;
-	detailRequestedStart = -1;
 	detailOffset = 0;
 	detailSelectedIndex = 0;
 	detailLines = [`Loading ${thread.ref}...`];
@@ -422,9 +368,6 @@ function renderDetailStart(payload) {
 	view = "detail";
 	detailOffset = 0;
 	detailSelectedIndex = 0;
-	detailLineStart = 0;
-	detailLineCount = 0;
-	detailRequestedStart = -1;
 	resetTitleScroll();
 	model.STATUS.string = message.text;
 	detailLines = [];
@@ -434,52 +377,20 @@ function renderDetailStart(payload) {
 
 function renderDetailLine(payload) {
 	const message = splitScopedMessage(payload);
-	const line = splitScopedMessage(message.text);
-	const lineIndex = Number(line.threadId);
-	if (message.threadId !== detailThreadId || !Number.isInteger(lineIndex)) {
-		return;
-	}
-
-	const localIndex = lineIndex - detailLineStart;
-	if (localIndex < 0 || localIndex >= DETAIL_PAGE_SIZE) {
-		return;
-	}
-
-	detailLines[localIndex] = line.text;
-	renderDetailRows();
-}
-
-function renderDetailDone(threadId) {
-	if (String(threadId) !== detailThreadId || detailLineCount !== 0) {
-		return;
-	}
-
-	detailLineCount = 1;
-	detailLines = ["No detail lines"];
-	renderDetailRows();
-}
-
-function renderDetailPage(payload) {
-	const message = splitScopedMessage(payload);
-	const page = splitScopedMessage(message.text);
 	if (message.threadId !== detailThreadId) {
 		return;
 	}
 
-	const start = Number(page.threadId);
-	const count = Number(page.text);
-	if (!Number.isInteger(start) || !Number.isInteger(count)) {
+	detailLines.push(message.text);
+	renderDetailRows();
+}
+
+function renderDetailDone(threadId) {
+	if (String(threadId) !== detailThreadId || detailLines.length !== 0) {
 		return;
 	}
 
-	detailLineStart = start;
-	detailLineCount = count;
-	detailRequestedStart = -1;
-	detailLines = [];
-	if (detailLineCount === 0) {
-		detailLineCount = 1;
-		detailLines = ["No detail lines"];
-	}
+	detailLines = ["No detail lines"];
 	renderDetailRows();
 }
 
@@ -496,9 +407,6 @@ function renderRows() {
 	view = "list";
 	detailThreadId = null;
 	detailLines = [];
-	detailLineStart = 0;
-	detailLineCount = 0;
-	detailRequestedStart = -1;
 	detailOffset = 0;
 	detailSelectedIndex = 0;
 	resetTitleScroll();
@@ -545,9 +453,6 @@ function renderThreadsLoading() {
 	view = "list";
 	detailThreadId = null;
 	detailLines = [];
-	detailLineStart = 0;
-	detailLineCount = 0;
-	detailRequestedStart = -1;
 	detailOffset = 0;
 	detailSelectedIndex = 0;
 	threads = [];
@@ -579,15 +484,15 @@ function addThreadLine(payload) {
 
 function moveSelection(delta) {
 	if (view === "detail") {
-		if (detailLineCount === 0) {
+		if (detailLines.length === 0) {
 			return;
 		}
 
 		detailSelectedIndex += delta;
 		if (detailSelectedIndex < 0) {
 			detailSelectedIndex = 0;
-		} else if (detailSelectedIndex >= detailLineCount) {
-			detailSelectedIndex = detailLineCount - 1;
+		} else if (detailSelectedIndex >= detailLines.length) {
+			detailSelectedIndex = detailLines.length - 1;
 		}
 
 		if (detailSelectedIndex < detailOffset) {
@@ -596,7 +501,6 @@ function moveSelection(delta) {
 			detailOffset = detailSelectedIndex - ROW_COUNT + 1;
 		}
 
-		ensureDetailBuffer();
 		resetTitleScroll();
 		renderDetailRows();
 		return;
@@ -653,7 +557,6 @@ const messages = new Message({
 		"THREADS_DONE",
 		"THREAD_ID",
 		"THREAD_DETAIL_START",
-		"THREAD_DETAIL_PAGE",
 		"THREAD_DETAIL_LINE",
 		"THREAD_DETAIL_DONE",
 		"THREAD_DETAIL_ERROR",
@@ -687,12 +590,6 @@ const messages = new Message({
 		const detailLinePayload = msg.get("THREAD_DETAIL_LINE");
 		if (detailLinePayload !== undefined) {
 			renderDetailLine(detailLinePayload);
-			return;
-		}
-
-		const detailPagePayload = msg.get("THREAD_DETAIL_PAGE");
-		if (detailPagePayload !== undefined) {
-			renderDetailPage(detailPagePayload);
 			return;
 		}
 

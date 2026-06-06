@@ -6,8 +6,6 @@ const settings = require("./settings");
 
 const clay = new Clay(clayConfig, null, { autoHandleEvents: false });
 let threadIds = [];
-let detailCache = null;
-const DETAIL_PAGE_SIZE = 8;
 
 function sendToWatch(payload) {
 	const onFailure = function (error) {
@@ -25,7 +23,6 @@ function sendToWatch(payload) {
 
 function sendError(message) {
 	threadIds = [];
-	detailCache = null;
 	sendToWatch({ ERROR: plain.shorten(message, 120) });
 }
 
@@ -62,35 +59,11 @@ function detailLines(detail) {
 }
 
 function sendThreadDetail(threadIndexText, detail) {
-	detailCache = {
-		threadIndex: threadIndexText,
-		lines: detailLines(detail),
-	};
-
 	sendToWatch({ THREAD_DETAIL_START: threadIndexText + "\n" + detail.ref + " " + detail.status + " " + detail.priorityLabel });
-	sendThreadDetailPage(threadIndexText, 0);
-}
 
-function sendThreadDetailPage(threadIndexText, offset) {
-	if (detailCache === null || detailCache.threadIndex !== threadIndexText) {
-		sendThreadDetailError(threadIndexText, "Thread detail expired. Reopen the thread.");
-		return;
-	}
-
-	let start = Number(offset);
-	if (!Number.isInteger(start) || start < 0) {
-		start = 0;
-	}
-
-	const total = detailCache.lines.length;
-	const maxStart = Math.max(0, total - DETAIL_PAGE_SIZE);
-	if (start > maxStart) {
-		start = maxStart;
-	}
-
-	sendToWatch({ THREAD_DETAIL_PAGE: threadIndexText + "\n" + start + "\n" + total });
-	for (let i = start; i < total && i < start + DETAIL_PAGE_SIZE; i += 1) {
-		sendToWatch({ THREAD_DETAIL_LINE: threadIndexText + "\n" + i + "\n" + detailCache.lines[i] });
+	const lines = detailLines(detail);
+	for (let i = 0; i < lines.length; i += 1) {
+		sendToWatch({ THREAD_DETAIL_LINE: threadIndexText + "\n" + lines[i] });
 	}
 
 	sendToWatch({ THREAD_DETAIL_DONE: threadIndexText });
@@ -190,9 +163,5 @@ Pebble.addEventListener("appmessage", function (e) {
 
 	if (e.payload.THREAD_ID) {
 		fetchThreadDetail(e.payload.THREAD_ID);
-	}
-	if (e.payload.THREAD_DETAIL_PAGE) {
-		const parts = String(e.payload.THREAD_DETAIL_PAGE).split("\n");
-		sendThreadDetailPage(parts[0], parts[1]);
 	}
 });
