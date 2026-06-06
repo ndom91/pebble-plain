@@ -41,12 +41,8 @@ function detailLines(detail) {
 		["Assignee", detail.assignee],
 	];
 
-	if (detail.messages.length === 0) {
-		lines.push(["Message", "None"]);
-	} else {
-		for (let i = 0; i < detail.messages.length; i += 1) {
-			lines.push(["Message", detail.messages[i]]);
-		}
+	for (let i = 0; i < detail.messages.length; i += 1) {
+		lines.push(["Message", detail.messages[i]]);
 	}
 
 	return lines;

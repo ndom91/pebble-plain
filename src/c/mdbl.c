@@ -5,10 +5,12 @@
 #define HEADER_HEIGHT 28
 #define MAX_THREADS 10
 #define MAX_DETAIL_ROWS 12
+#define MAX_MESSAGES 5
 #define REF_LEN 17
 #define TITLE_LEN 73
 #define DETAIL_KEY_LEN 17
 #define DETAIL_VALUE_LEN 73
+#define MESSAGE_VALUE_LEN 73
 #define STATUS_LEN 49
 #define EMPTY_TEXT_LEN 73
 #define PENDING_ID_LEN 4
@@ -24,6 +26,7 @@
 typedef enum {
   ViewList,
   ViewDetail,
+  ViewMessages,
 } View;
 
 typedef struct {
@@ -46,16 +49,21 @@ static GFont s_detail_value_font;
 static View s_view = ViewList;
 static ThreadRow s_threads[MAX_THREADS];
 static DetailRow s_detail_rows[MAX_DETAIL_ROWS];
+static char s_messages[MAX_MESSAGES][MESSAGE_VALUE_LEN];
+static char s_thread_ref[REF_LEN];
 static char s_status[STATUS_LEN] = "Loading";
 static char s_empty_text[EMPTY_TEXT_LEN] = "Loading threads...";
 static char s_pending_thread_index[PENDING_ID_LEN];
 static char s_parse_buffer[INBOX_SIZE];
 static int s_thread_count;
 static int s_detail_count;
+static int s_message_count;
 static int s_selected_index;
 static int s_first_visible_index;
 static int s_detail_selected_index;
 static int s_detail_offset;
+static int s_message_selected_index;
+static int s_message_offset;
 static int s_marquee_index;
 static int s_marquee_pause;
 
@@ -102,8 +110,12 @@ static bool selected_text_overflows(void) {
     return (int)(strlen(row->ref) + 1 + strlen(row->title)) > LIST_MARQUEE_WINDOW;
   }
 
-  if (s_view == ViewDetail && s_detail_count > 0) {
+  if (s_view == ViewDetail && s_detail_count > 0 && s_detail_selected_index < s_detail_count) {
     return (int)strlen(s_detail_rows[s_detail_selected_index].value) > DETAIL_MARQUEE_WINDOW;
+  }
+
+  if (s_view == ViewMessages && s_message_count > 0) {
+    return (int)strlen(s_messages[s_message_selected_index]) > DETAIL_MARQUEE_WINDOW;
   }
 
   return false;
@@ -189,6 +201,22 @@ static char *split_field(char *record) {
   return separator + 1;
 }
 
+static void copy_ref_from_status(const char *status) {
+  char ref[REF_LEN];
+  copy_text(ref, sizeof(ref), status);
+
+  char *space = strchr(ref, ' ');
+  if (space) {
+    *space = '\0';
+  }
+
+  copy_text(s_thread_ref, sizeof(s_thread_ref), ref);
+}
+
+static int detail_row_count(void) {
+  return s_detail_count == 0 ? 0 : s_detail_count + 1;
+}
+
 static void clamp_list_selection(void) {
   if (s_thread_count == 0) {
     s_selected_index = 0;
@@ -210,7 +238,8 @@ static void clamp_list_selection(void) {
 }
 
 static void clamp_detail_selection(void) {
-  if (s_detail_count == 0) {
+  int rows = detail_row_count();
+  if (rows == 0) {
     s_detail_selected_index = 0;
     s_detail_offset = 0;
     return;
@@ -218,8 +247,8 @@ static void clamp_detail_selection(void) {
 
   if (s_detail_selected_index < 0) {
     s_detail_selected_index = 0;
-  } else if (s_detail_selected_index >= s_detail_count) {
-    s_detail_selected_index = s_detail_count - 1;
+  } else if (s_detail_selected_index >= rows) {
+    s_detail_selected_index = rows - 1;
   }
 
   if (s_detail_selected_index < s_detail_offset) {
@@ -229,14 +258,38 @@ static void clamp_detail_selection(void) {
   }
 }
 
+static void clamp_message_selection(void) {
+  if (s_message_count == 0) {
+    s_message_selected_index = 0;
+    s_message_offset = 0;
+    return;
+  }
+
+  if (s_message_selected_index < 0) {
+    s_message_selected_index = 0;
+  } else if (s_message_selected_index >= s_message_count) {
+    s_message_selected_index = s_message_count - 1;
+  }
+
+  if (s_message_selected_index < s_message_offset) {
+    s_message_offset = s_message_selected_index;
+  } else if (s_message_selected_index >= s_message_offset + ROW_COUNT) {
+    s_message_offset = s_message_selected_index - ROW_COUNT + 1;
+  }
+}
+
 static void render_error(const char *message) {
   s_view = ViewList;
   s_pending_thread_index[0] = '\0';
+  s_thread_ref[0] = '\0';
   reset_marquee();
   s_thread_count = 0;
   s_detail_count = 0;
+  s_message_count = 0;
   s_selected_index = 0;
   s_first_visible_index = 0;
+  s_message_selected_index = 0;
+  s_message_offset = 0;
   copy_text(s_status, sizeof(s_status), "Error");
   copy_text(s_empty_text, sizeof(s_empty_text), message);
   mark_dirty();
@@ -245,8 +298,11 @@ static void render_error(const char *message) {
 static void render_detail_error(const char *message) {
   s_view = ViewDetail;
   s_detail_count = 0;
+  s_message_count = 0;
   s_detail_selected_index = 0;
   s_detail_offset = 0;
+  s_message_selected_index = 0;
+  s_message_offset = 0;
   reset_marquee();
   copy_text(s_status, sizeof(s_status), "Thread detail");
   copy_text(s_empty_text, sizeof(s_empty_text), message);
@@ -256,8 +312,12 @@ static void render_detail_error(const char *message) {
 static void parse_threads(const char *payload) {
   copy_text(s_parse_buffer, sizeof(s_parse_buffer), payload);
   s_thread_count = 0;
+  s_detail_count = 0;
+  s_message_count = 0;
   s_selected_index = 0;
   s_first_visible_index = 0;
+  s_message_selected_index = 0;
+  s_message_offset = 0;
   s_view = ViewList;
   s_pending_thread_index[0] = '\0';
   reset_marquee();
@@ -293,22 +353,32 @@ static void parse_detail(const char *payload) {
 
   s_view = ViewDetail;
   s_detail_count = 0;
+  s_message_count = 0;
   s_detail_selected_index = 0;
   s_detail_offset = 0;
+  s_message_selected_index = 0;
+  s_message_offset = 0;
   reset_marquee();
-  copy_text(s_status, sizeof(s_status), status);
+  copy_ref_from_status(status);
   copy_text(s_empty_text, sizeof(s_empty_text), "No detail lines");
 
   char *record;
-  while ((record = next_record(&cursor)) && s_detail_count < MAX_DETAIL_ROWS) {
+  while ((record = next_record(&cursor))) {
     if (record[0] == '\0') {
       continue;
     }
 
     char *value = split_field(record);
-    copy_text(s_detail_rows[s_detail_count].key, sizeof(s_detail_rows[s_detail_count].key), record);
-    copy_text(s_detail_rows[s_detail_count].value, sizeof(s_detail_rows[s_detail_count].value), value);
-    s_detail_count += 1;
+    if (strcmp(record, "Message") == 0) {
+      if (s_message_count < MAX_MESSAGES) {
+        copy_text(s_messages[s_message_count], sizeof(s_messages[s_message_count]), value);
+        s_message_count += 1;
+      }
+    } else if (s_detail_count < MAX_DETAIL_ROWS) {
+      copy_text(s_detail_rows[s_detail_count].key, sizeof(s_detail_rows[s_detail_count].key), record);
+      copy_text(s_detail_rows[s_detail_count].value, sizeof(s_detail_rows[s_detail_count].value), value);
+      s_detail_count += 1;
+    }
   }
 
   clamp_detail_selection();
@@ -342,6 +412,10 @@ static void draw_header(GContext *ctx, GRect bounds) {
   char status_text[STATUS_LEN];
   if (s_view == ViewList && s_thread_count > 0) {
     snprintf(status_text, sizeof(status_text), "TODO %d/%d", s_selected_index + 1, s_thread_count);
+  } else if (s_view == ViewDetail && s_thread_ref[0] != '\0') {
+    copy_text(status_text, sizeof(status_text), s_thread_ref);
+  } else if (s_view == ViewMessages && s_thread_ref[0] != '\0') {
+    snprintf(status_text, sizeof(status_text), "%s Messages (%d)", s_thread_ref, s_message_count);
   } else {
     copy_text(status_text, sizeof(status_text), s_status);
   }
@@ -385,8 +459,8 @@ static void draw_detail_row(GContext *ctx, GRect row_frame, GRect content_frame,
   }
 
   DetailRow *row = &s_detail_rows[detail_index];
-  GRect key_frame = GRect(content_frame.origin.x + 8, content_frame.origin.y + 3, content_frame.size.w - 14, 16);
-  GRect value_frame = GRect(content_frame.origin.x + 8, content_frame.origin.y + 19, content_frame.size.w - 14, content_frame.size.h - 18);
+  GRect key_frame = GRect(content_frame.origin.x + 8, content_frame.origin.y + 1, content_frame.size.w - 14, 16);
+  GRect value_frame = GRect(content_frame.origin.x + 8, content_frame.origin.y + 17, content_frame.size.w - 14, content_frame.size.h - 16);
   char value_text[DETAIL_VALUE_LEN];
   copy_text(value_text, sizeof(value_text), row->value);
   if (selected) {
@@ -394,6 +468,39 @@ static void draw_detail_row(GContext *ctx, GRect row_frame, GRect content_frame,
   }
   draw_text(ctx, row->key, s_detail_key_font, key_frame, GTextAlignmentLeft);
   draw_text(ctx, value_text, s_detail_value_font, value_frame, GTextAlignmentLeft);
+}
+
+static void draw_messages_button_row(GContext *ctx, GRect row_frame, GRect content_frame, bool selected) {
+  if (selected) {
+    graphics_context_set_fill_color(ctx, accent_color());
+    graphics_fill_rect(ctx, row_frame, 0, GCornerNone);
+    graphics_context_set_text_color(ctx, GColorBlack);
+  } else {
+    graphics_context_set_text_color(ctx, GColorWhite);
+  }
+
+  GRect label_frame = GRect(content_frame.origin.x + 8, content_frame.origin.y + 6, content_frame.size.w - 38, content_frame.size.h - 6);
+  GRect chevron_frame = GRect(content_frame.origin.x + content_frame.size.w - 30, content_frame.origin.y + 6, 22, content_frame.size.h - 6);
+  draw_text(ctx, "Messages", s_list_font, label_frame, GTextAlignmentLeft);
+  draw_text(ctx, ">", s_list_font, chevron_frame, GTextAlignmentRight);
+}
+
+static void draw_message_row(GContext *ctx, GRect row_frame, GRect content_frame, int message_index, bool selected) {
+  if (selected) {
+    graphics_context_set_fill_color(ctx, accent_color());
+    graphics_fill_rect(ctx, row_frame, 0, GCornerNone);
+    graphics_context_set_text_color(ctx, GColorBlack);
+  } else {
+    graphics_context_set_text_color(ctx, GColorWhite);
+  }
+
+  char message_text[MESSAGE_VALUE_LEN];
+  copy_text(message_text, sizeof(message_text), s_messages[message_index]);
+  if (selected) {
+    marquee_text(s_messages[message_index], message_text, sizeof(message_text), DETAIL_MARQUEE_WINDOW);
+  }
+
+  draw_text(ctx, message_text, s_list_font, GRect(content_frame.origin.x + 6, content_frame.origin.y + 6, content_frame.size.w - 12, content_frame.size.h - 6), GTextAlignmentLeft);
 }
 
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
@@ -417,7 +524,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
           draw_list_row(ctx, row_frame, content_frame, thread_index, thread_index == s_selected_index);
         }
       }
-    } else {
+    } else if (s_view == ViewDetail) {
       if (s_detail_count == 0) {
         if (i == 0) {
           draw_empty_row(ctx, row_frame, content_frame);
@@ -426,6 +533,19 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
         int detail_index = s_detail_offset + i;
         if (detail_index < s_detail_count) {
           draw_detail_row(ctx, row_frame, content_frame, detail_index, detail_index == s_detail_selected_index);
+        } else if (detail_index == s_detail_count) {
+          draw_messages_button_row(ctx, row_frame, content_frame, detail_index == s_detail_selected_index);
+        }
+      }
+    } else {
+      if (s_message_count == 0) {
+        if (i == 0) {
+          draw_empty_row(ctx, row_frame, content_frame);
+        }
+      } else {
+        int message_index = s_message_offset + i;
+        if (message_index < s_message_count) {
+          draw_message_row(ctx, row_frame, content_frame, message_index, message_index == s_message_selected_index);
         }
       }
     }
@@ -436,6 +556,9 @@ static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (s_view == ViewDetail) {
     s_detail_selected_index -= 1;
     clamp_detail_selection();
+  } else if (s_view == ViewMessages) {
+    s_message_selected_index -= 1;
+    clamp_message_selection();
   } else {
     s_selected_index -= 1;
     clamp_list_selection();
@@ -448,6 +571,9 @@ static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (s_view == ViewDetail) {
     s_detail_selected_index += 1;
     clamp_detail_selection();
+  } else if (s_view == ViewMessages) {
+    s_message_selected_index += 1;
+    clamp_message_selection();
   } else {
     s_selected_index += 1;
     clamp_list_selection();
@@ -457,6 +583,18 @@ static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  if (s_view == ViewDetail) {
+    if (s_detail_count > 0 && s_detail_selected_index == s_detail_count) {
+      s_view = ViewMessages;
+      s_message_selected_index = 0;
+      s_message_offset = 0;
+      copy_text(s_empty_text, sizeof(s_empty_text), "No messages");
+      reset_marquee();
+      mark_dirty();
+    }
+    return;
+  }
+
   if (s_view != ViewList || s_thread_count == 0) {
     return;
   }
@@ -467,14 +605,19 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
   s_detail_offset = 0;
   reset_marquee();
   snprintf(s_pending_thread_index, sizeof(s_pending_thread_index), "%d", s_selected_index);
-  copy_text(s_status, sizeof(s_status), s_threads[s_selected_index].ref);
+  copy_text(s_thread_ref, sizeof(s_thread_ref), s_threads[s_selected_index].ref);
+  copy_text(s_status, sizeof(s_status), s_thread_ref);
   copy_text(s_empty_text, sizeof(s_empty_text), "Loading detail...");
   mark_dirty();
   send_thread_id();
 }
 
 static void back_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (s_view == ViewDetail) {
+  if (s_view == ViewMessages) {
+    s_view = ViewDetail;
+    reset_marquee();
+    mark_dirty();
+  } else if (s_view == ViewDetail) {
     s_view = ViewList;
     s_pending_thread_index[0] = '\0';
     reset_marquee();
