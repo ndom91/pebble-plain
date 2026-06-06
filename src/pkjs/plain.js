@@ -33,10 +33,34 @@ const threadDetailQuery = `
               previewText
               priority
               status
+              createdAt {
+                iso8601
+              }
               customer {
                 fullName
                 email {
                   email
+                }
+                company {
+                  name
+                }
+              }
+              labels {
+                labelType {
+                  name
+                }
+              }
+              assignedTo {
+                __typename
+                ... on User {
+                  fullName
+                }
+                ... on MachineUser {
+                  fullName
+                  publicName
+                }
+                ... on System {
+                  id
                 }
               }
               timelineEntries(filters: { isMessage: true }, last: 5) {
@@ -127,6 +151,46 @@ function entryText(entry) {
 		default:
 			return compactText(entry.__typename);
 	}
+}
+
+function shortDate(value) {
+	if (value === null || value === undefined || value.iso8601 === undefined) {
+		return "";
+	}
+
+	return String(value.iso8601).slice(0, 10);
+}
+
+function assigneeText(assignee) {
+	if (assignee === null || assignee === undefined) {
+		return "Unassigned";
+	}
+	if (assignee.fullName) {
+		return compactText(assignee.fullName);
+	}
+	if (assignee.publicName) {
+		return compactText(assignee.publicName);
+	}
+	if (assignee.id) {
+		return compactText(assignee.id);
+	}
+
+	return compactText(assignee.__typename);
+}
+
+function labelsText(labels) {
+	if (!Array.isArray(labels) || labels.length === 0) {
+		return "None";
+	}
+
+	const names = [];
+	for (let i = 0; i < labels.length; i += 1) {
+		if (labels[i].labelType && labels[i].labelType.name) {
+			names.push(labels[i].labelType.name);
+		}
+	}
+
+	return names.length === 0 ? "None" : compactText(names.join(", "));
 }
 
 function graphqlErrorMessage(xhr) {
@@ -231,7 +295,9 @@ function fetchThreadDetail(apiKey, threadId, onDetail, onError) {
 		const edges = data.thread.timelineEntries.edges;
 		const customer = data.thread.customer;
 		const customerEmail = customer && customer.email ? customer.email.email : "";
-		const customerText = customer ? compactText(customer.fullName || customerEmail) : "";
+		const customerName = customer ? compactText(customer.fullName || customerEmail) : "Unknown";
+		const companyName = customer && customer.company ? compactText(customer.company.name) : "";
+		const customerText = companyName === "" ? customerName : customerName + " @ " + companyName;
 		const priorityLabel = data.thread.priority === null || data.thread.priority === undefined ? "" : "P" + data.thread.priority;
 
 		for (let i = 0; i < edges.length; i += 1) {
@@ -249,7 +315,10 @@ function fetchThreadDetail(apiKey, threadId, onDetail, onError) {
 			previewText: shorten(compactText(data.thread.previewText), 80),
 			priorityLabel: priorityLabel,
 			status: data.thread.status,
-			customer: shorten(customerText, 60),
+			customer: shorten(customerText, 80),
+			createdAt: shortDate(data.thread.createdAt),
+			labels: shorten(labelsText(data.thread.labels), 80),
+			assignee: shorten(assigneeText(data.thread.assignedTo), 80),
 			updatedAt: "",
 			messages: messages,
 		});

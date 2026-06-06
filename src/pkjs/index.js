@@ -9,8 +9,8 @@ let threadIds = [];
 const FIELD_SEPARATOR = "\x1f";
 const RECORD_SEPARATOR = "\x1e";
 
-function messageText(value) {
-	return plain.shorten(value, 100).replace(/[\x1e\x1f]/g, " ");
+function messageText(value, max) {
+	return plain.shorten(value, max || 72).replace(/[^\x20-\x7e]/g, "?").replace(/[\x1e\x1f]/g, " ");
 }
 
 function sendToWatch(payload) {
@@ -33,31 +33,24 @@ function sendError(message) {
 }
 
 function sendThreadDetailError(threadId, message) {
-	sendToWatch({ THREAD_DETAIL_ERROR: threadId + FIELD_SEPARATOR + messageText(message) });
+	sendToWatch({ THREAD_DETAIL_ERROR: threadId + FIELD_SEPARATOR + messageText(message, 72) });
 }
 
 function detailLines(detail) {
-	const lines = [detail.title];
-
-	if (detail.customer !== "") {
-		lines.push("From " + detail.customer);
-	}
-	if (detail.updatedAt !== "") {
-		lines.push("Updated " + detail.updatedAt);
-	}
-
-	if (detail.description !== "") {
-		lines.push(detail.description);
-	} else if (detail.previewText !== "") {
-		lines.push(detail.previewText);
-	}
+	const lines = [
+		["Title", detail.title],
+		["From", detail.customer],
+		["Created", detail.createdAt],
+		["Priority", detail.priorityLabel === "" ? "None" : detail.priorityLabel],
+		["Labels", detail.labels],
+		["Assignee", detail.assignee],
+	];
 
 	if (detail.messages.length === 0) {
-		lines.push("No messages");
+		lines.push(["Message", "None"]);
 	} else {
-		lines.push("Messages");
 		for (let i = 0; i < detail.messages.length; i += 1) {
-			lines.push(detail.messages[i]);
+			lines.push(["Message", detail.messages[i]]);
 		}
 	}
 
@@ -67,11 +60,11 @@ function detailLines(detail) {
 function sendThreadDetail(threadIndexText, detail) {
 	const records = [
 		threadIndexText,
-		messageText(detail.ref + " " + detail.status + " " + detail.priorityLabel),
+		messageText(detail.ref + " " + detail.status + " " + detail.priorityLabel, 48),
 	];
 	const lines = detailLines(detail);
 	for (let i = 0; i < lines.length; i += 1) {
-		records.push(messageText(lines[i]));
+		records.push(messageText(lines[i][0], 16) + FIELD_SEPARATOR + messageText(lines[i][1], 72));
 	}
 
 	sendToWatch({ THREAD_DETAIL: records.join(RECORD_SEPARATOR) });
@@ -106,7 +99,7 @@ function fetchTodoThreads() {
 
 		for (let i = 0; i < threads.length; i += 1) {
 			threadIds.push(threads[i].id);
-			records.push(messageText(threads[i].ref) + FIELD_SEPARATOR + messageText(threads[i].title));
+			records.push(messageText(threads[i].ref, 16) + FIELD_SEPARATOR + messageText(threads[i].title, 72));
 		}
 
 		sendToWatch({ THREADS: records.join(RECORD_SEPARATOR) });

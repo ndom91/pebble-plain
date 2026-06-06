@@ -37,11 +37,12 @@ const detailStyle = new Style({
 	font: "14px Gothic",
 	color: ["white", "#06231E"],
 	horizontal: "left",
-	vertical: "middle",
-	left: 6,
+	vertical: "top",
+	left: 8,
 	right: 6,
+	top: 3,
+	bottom: 2,
 });
-
 const model = {};
 let threads = [];
 let selectedIndex = 0;
@@ -216,7 +217,11 @@ const ThreadsApplication = Application.template(($) => ({
 	],
 }));
 
-new ThreadsApplication(model, { displayListLength: 1024 });
+new ThreadsApplication(model, {
+	displayListLength: 512,
+	commandListLength: 512,
+	regionLength: 128,
+});
 
 function shorten(value, max) {
 	if (value === undefined || value === null) {
@@ -262,6 +267,26 @@ function marqueeText(text) {
 	return loop.slice(index, index + TITLE_WINDOW);
 }
 
+function detailKey(line) {
+	const separator = line.indexOf(FIELD_SEPARATOR);
+	return separator < 0 ? line : line.slice(0, separator);
+}
+
+function detailValue(line) {
+	const separator = line.indexOf(FIELD_SEPARATOR);
+	return separator < 0 ? "" : line.slice(separator + 1);
+}
+
+function formatDetailLine(line, active) {
+	const key = detailKey(line);
+	const value = detailValue(line);
+	if (value === "") {
+		return key;
+	}
+
+	return key + "\n" + (active ? marqueeText(value) : shorten(value, TITLE_WINDOW));
+}
+
 function resetTitleScroll() {
 	titleScrollIndex = 0;
 	titleScrollPause = TITLE_SCROLL_PAUSE_TICKS;
@@ -291,7 +316,7 @@ function renderSelectedTitle() {
 		return;
 	}
 
-	getTitle(rowIndex).string = marqueeText(detailLines[detailSelectedIndex]);
+	getTitle(rowIndex).string = formatDetailLine(detailLines[detailSelectedIndex], true);
 }
 
 function advanceTitleScroll() {
@@ -300,7 +325,7 @@ function advanceTitleScroll() {
 	if (view === "list" && threads.length !== 0) {
 		text = formatThread(threads[selectedIndex]);
 	} else if (view === "detail" && detailLines.length !== 0) {
-		text = detailLines[detailSelectedIndex];
+		text = detailValue(detailLines[detailSelectedIndex]);
 	} else {
 		return;
 	}
@@ -319,6 +344,7 @@ function advanceTitleScroll() {
 }
 
 function renderDetailRows() {
+	view = "detail";
 	model.SPLASH.visible = false;
 	model.STATUS.visible = true;
 
@@ -333,7 +359,7 @@ function renderDetailRows() {
 		row.state = active ? 1 : 0;
 		title.style = detailStyle;
 		title.state = row.state;
-		title.string = visible ? (active ? marqueeText(detailLines[lineIndex]) : shorten(detailLines[lineIndex], TITLE_WINDOW)) : "";
+		title.string = visible ? formatDetailLine(detailLines[lineIndex], active) : "";
 	}
 }
 
@@ -343,8 +369,8 @@ function renderDetailLoading(thread, threadIndex) {
 	detailOffset = 0;
 	detailSelectedIndex = 0;
 	detailLines = [`Loading ${thread.ref}...`];
-	resetTitleScroll();
 	model.STATUS.string = thread.ref;
+	resetTitleScroll();
 	renderDetailRows();
 }
 
@@ -510,7 +536,7 @@ const messages = new Message({
 		"THREAD_DETAIL_ERROR",
 		"ERROR",
 	],
-	input: 1536,
+	input: 1152,
 	output: 128,
 	onReadable() {
 		const msg = this.read();
