@@ -10,11 +10,13 @@
 #define TITLE_LEN 73
 #define DETAIL_KEY_LEN 17
 #define DETAIL_VALUE_LEN 73
-#define MESSAGE_VALUE_LEN 73
+#define MESSAGE_AUTHOR_LEN 33
+#define MESSAGE_SENT_LEN 17
+#define MESSAGE_VALUE_LEN 161
 #define STATUS_LEN 49
 #define EMPTY_TEXT_LEN 73
 #define PENDING_ID_LEN 4
-#define INBOX_SIZE 1152
+#define INBOX_SIZE 2048
 #define OUTBOX_SIZE 128
 #define MARQUEE_INTERVAL_MS 650
 #define MARQUEE_PAUSE_TICKS 1
@@ -27,6 +29,7 @@ typedef enum {
   ViewList,
   ViewDetail,
   ViewMessages,
+  ViewMessageDetail,
 } View;
 
 typedef struct {
@@ -39,6 +42,12 @@ typedef struct {
   char value[DETAIL_VALUE_LEN];
 } DetailRow;
 
+typedef struct {
+  char author[MESSAGE_AUTHOR_LEN];
+  char sent_at[MESSAGE_SENT_LEN];
+  char text[MESSAGE_VALUE_LEN];
+} MessageRow;
+
 static Window *s_window;
 static Layer *s_canvas_layer;
 static AppTimer *s_marquee_timer;
@@ -49,7 +58,7 @@ static GFont s_detail_value_font;
 static View s_view = ViewList;
 static ThreadRow s_threads[MAX_THREADS];
 static DetailRow s_detail_rows[MAX_DETAIL_ROWS];
-static char s_messages[MAX_MESSAGES][MESSAGE_VALUE_LEN];
+static MessageRow s_messages[MAX_MESSAGES];
 static char s_thread_ref[REF_LEN];
 static char s_status[STATUS_LEN] = "Loading";
 static char s_empty_text[EMPTY_TEXT_LEN] = "Loading threads...";
@@ -115,7 +124,7 @@ static bool selected_text_overflows(void) {
   }
 
   if (s_view == ViewMessages && s_message_count > 0) {
-    return (int)strlen(s_messages[s_message_selected_index]) > DETAIL_MARQUEE_WINDOW;
+    return (int)strlen(s_messages[s_message_selected_index].text) > DETAIL_MARQUEE_WINDOW;
   }
 
   return false;
@@ -371,7 +380,11 @@ static void parse_detail(const char *payload) {
     char *value = split_field(record);
     if (strcmp(record, "Message") == 0) {
       if (s_message_count < MAX_MESSAGES) {
-        copy_text(s_messages[s_message_count], sizeof(s_messages[s_message_count]), value);
+        char *sent_at = split_field(value);
+        char *text = split_field(sent_at);
+        copy_text(s_messages[s_message_count].author, sizeof(s_messages[s_message_count].author), value);
+        copy_text(s_messages[s_message_count].sent_at, sizeof(s_messages[s_message_count].sent_at), sent_at);
+        copy_text(s_messages[s_message_count].text, sizeof(s_messages[s_message_count].text), text);
         s_message_count += 1;
       }
     } else if (s_detail_count < MAX_DETAIL_ROWS) {
@@ -416,6 +429,8 @@ static void draw_header(GContext *ctx, GRect bounds) {
     copy_text(status_text, sizeof(status_text), s_thread_ref);
   } else if (s_view == ViewMessages && s_thread_ref[0] != '\0') {
     snprintf(status_text, sizeof(status_text), "%s Messages (%d)", s_thread_ref, s_message_count);
+  } else if (s_view == ViewMessageDetail && s_thread_ref[0] != '\0') {
+    snprintf(status_text, sizeof(status_text), "%s Msg %d/%d", s_thread_ref, s_message_selected_index + 1, s_message_count);
   } else {
     copy_text(status_text, sizeof(status_text), s_status);
   }
@@ -500,12 +515,41 @@ static void draw_message_row(GContext *ctx, GRect row_frame, GRect content_frame
   }
 
   char message_text[MESSAGE_VALUE_LEN];
-  copy_text(message_text, sizeof(message_text), s_messages[message_index]);
+  copy_text(message_text, sizeof(message_text), s_messages[message_index].text);
   if (selected) {
-    marquee_text(s_messages[message_index], message_text, sizeof(message_text), DETAIL_MARQUEE_WINDOW);
+    marquee_text(s_messages[message_index].text, message_text, sizeof(message_text), DETAIL_MARQUEE_WINDOW);
   }
 
-  draw_text(ctx, message_text, s_list_font, GRect(content_frame.origin.x + 6, content_frame.origin.y + 6, content_frame.size.w - 12, content_frame.size.h - 6), GTextAlignmentLeft);
+  draw_text(ctx, message_text, s_list_font, GRect(content_frame.origin.x + 6, content_frame.origin.y + 6, content_frame.size.w - 42, content_frame.size.h - 6), GTextAlignmentLeft);
+  draw_text(ctx, ">", s_list_font, GRect(content_frame.origin.x + content_frame.size.w - 30, content_frame.origin.y + 6, 22, content_frame.size.h - 6), GTextAlignmentRight);
+}
+
+static void draw_message_detail_page(GContext *ctx, GRect bounds) {
+  if (s_message_count == 0) {
+    draw_empty_row(ctx, GRect(0, HEADER_HEIGHT, bounds.size.w, bounds.size.h - HEADER_HEIGHT), GRect(0, HEADER_HEIGHT, bounds.size.w, bounds.size.h - HEADER_HEIGHT));
+    return;
+  }
+
+  MessageRow *message = &s_messages[s_message_selected_index];
+#if defined(PBL_ROUND)
+  int inset = 20;
+#else
+  int inset = 8;
+#endif
+  GRect body_frame = GRect(inset, HEADER_HEIGHT, bounds.size.w - inset * 2, bounds.size.h - HEADER_HEIGHT);
+  GRect author_key_frame = GRect(body_frame.origin.x, body_frame.origin.y + 2, body_frame.size.w, 14);
+  GRect author_value_frame = GRect(body_frame.origin.x, body_frame.origin.y + 16, body_frame.size.w, 20);
+  GRect sent_key_frame = GRect(body_frame.origin.x, body_frame.origin.y + 39, body_frame.size.w, 14);
+  GRect sent_value_frame = GRect(body_frame.origin.x, body_frame.origin.y + 53, body_frame.size.w, 20);
+  GRect text_frame = GRect(body_frame.origin.x, body_frame.origin.y + 78, body_frame.size.w, body_frame.size.h - 78);
+
+  graphics_context_set_text_color(ctx, accent_color());
+  draw_text(ctx, "Author", s_detail_key_font, author_key_frame, GTextAlignmentLeft);
+  draw_text(ctx, "Sent", s_detail_key_font, sent_key_frame, GTextAlignmentLeft);
+  graphics_context_set_text_color(ctx, GColorWhite);
+  draw_text(ctx, message->author, s_detail_value_font, author_value_frame, GTextAlignmentLeft);
+  draw_text(ctx, message->sent_at, s_detail_value_font, sent_value_frame, GTextAlignmentLeft);
+  draw_text(ctx, message->text, s_detail_value_font, text_frame, GTextAlignmentLeft);
 }
 
 static void canvas_update_proc(Layer *layer, GContext *ctx) {
@@ -513,6 +557,11 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, background_color());
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   draw_header(ctx, bounds);
+
+  if (s_view == ViewMessageDetail) {
+    draw_message_detail_page(ctx, bounds);
+    return;
+  }
 
   int row_height = (bounds.size.h - HEADER_HEIGHT) / ROW_COUNT;
   for (int i = 0; i < ROW_COUNT; i += 1) {
@@ -542,7 +591,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
           draw_messages_button_row(ctx, row_frame, content_frame, detail_index == s_detail_selected_index);
         }
       }
-    } else {
+    } else if (s_view == ViewMessages) {
       if (s_message_count == 0) {
         if (i == 0) {
           draw_empty_row(ctx, row_frame, content_frame);
@@ -558,7 +607,9 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
 }
 
 static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (s_view == ViewDetail) {
+  if (s_view == ViewMessageDetail) {
+    return;
+  } else if (s_view == ViewDetail) {
     s_detail_selected_index -= 1;
     clamp_detail_selection();
   } else if (s_view == ViewMessages) {
@@ -573,7 +624,9 @@ static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (s_view == ViewDetail) {
+  if (s_view == ViewMessageDetail) {
+    return;
+  } else if (s_view == ViewDetail) {
     s_detail_selected_index += 1;
     clamp_detail_selection();
   } else if (s_view == ViewMessages) {
@@ -600,6 +653,15 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
     return;
   }
 
+  if (s_view == ViewMessages) {
+    if (s_message_count > 0) {
+      s_view = ViewMessageDetail;
+      reset_marquee();
+      mark_dirty();
+    }
+    return;
+  }
+
   if (s_view != ViewList || s_thread_count == 0) {
     return;
   }
@@ -618,7 +680,11 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void back_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (s_view == ViewMessages) {
+  if (s_view == ViewMessageDetail) {
+    s_view = ViewMessages;
+    reset_marquee();
+    mark_dirty();
+  } else if (s_view == ViewMessages) {
     s_view = ViewDetail;
     reset_marquee();
     mark_dirty();

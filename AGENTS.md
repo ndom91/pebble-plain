@@ -78,7 +78,7 @@ usage, and PKJS payload names in sync when adding/removing keys: `THREADS`,
 ## Constraints & gotchas
 
 - **Tiny memory budget on the watch.** The native C app opens AppMessage with
-  `INBOX_SIZE = 1152` and `OUTBOX_SIZE = 128`, and stores parsed data in
+  `INBOX_SIZE = 2048` and `OUTBOX_SIZE = 128`, and stores parsed data in
   fixed-size static arrays. Keep watch payloads compact: text is shortened
   phone-side (`messageText`, `shorten`) and sanitized to printable ASCII before
   sending (`[^\x20-\x7e]` replaced with `?`).

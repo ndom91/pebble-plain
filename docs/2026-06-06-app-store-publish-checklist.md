@@ -4,7 +4,7 @@
 
 - App name: `Plain`
 - Package name: `plain-pebble`
-- Version: `1.0.0`
+- Version: read from `package.json`
 - Type: watchapp, not watchface
 - Target platforms: `emery`, `gabbro`
 - Capabilities: configurable
@@ -43,7 +43,7 @@ Initial public release. Shows Plain TODO threads, thread details, and recent mes
 - Store icon source: `assets/icon.png`
 - Store small icon: `assets/store-icon-small.png`
 - Store large icon: `assets/store-icon-large.png`
-- Store screenshots: put screenshots in `screenshots/`. Filenames must start with the platform name, for example `screenshots/emery_thread-list.png` or `screenshots/gabbro_thread-list.png`.
+- Store screenshots: put screenshots in `assets/screenshots/`. Filenames must start with the platform name, for example `assets/screenshots/emery_thread-list.png` or `assets/screenshots/gabbro_thread-list.png`.
 
 Set `--source` to the public repository URL after the repository exists.
 
@@ -69,7 +69,7 @@ pebble login
 Override dynamic values with environment variables if needed:
 
 ```sh
-APP_VERSION=1.0.1 RELEASE_NOTES="Bug fixes." ./scripts/publish.sh
+APP_VERSION=1.0.4 RELEASE_NOTES="Bug fixes." ./scripts/publish.sh
 ```
 
 Interactive upload without the script:
@@ -85,14 +85,14 @@ Non-interactive upload template:
 ```sh
 pebble publish --non-interactive \
   --name "Plain" \
-  --version "1.0.0" \
+  --version "<package.json version>" \
   --description "Plain for Pebble shows your Plain TODO support threads on the watch, including thread references, titles, customer metadata, labels, assignees, and recent messages. Requires a Plain machine-user API key configured from the Pebble/Rebble phone app. The API key is stored on the phone and is not sent to the watch." \
   --category tools \
   --source "<public-repository-url>" \
   --icon-small assets/store-icon-small.png \
   --icon-large assets/store-icon-large.png \
   --screenshots "<emery_screenshot.png>" \
-  --release-notes "Initial public release. Shows Plain TODO threads, thread details, and recent messages with native Pebble navigation and phone-side API-key configuration."
+  --release-notes "Adds selectable message detail pages with author, sent time, and full message text."
 ```
 
 Use `--is-published` only when the listing should become visible immediately.

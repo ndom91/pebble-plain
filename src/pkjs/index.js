@@ -42,7 +42,7 @@ function detailLines(detail) {
 	];
 
 	for (let i = 0; i < detail.messages.length; i += 1) {
-		lines.push(["Message", detail.messages[i]]);
+		lines.push(["Message", detail.messages[i].author, detail.messages[i].sentAt, detail.messages[i].text]);
 	}
 
 	return lines;
@@ -55,7 +55,11 @@ function sendThreadDetail(threadIndexText, detail) {
 	];
 	const lines = detailLines(detail);
 	for (let i = 0; i < lines.length; i += 1) {
-		records.push(messageText(lines[i][0], 16) + FIELD_SEPARATOR + messageText(lines[i][1], 72));
+		if (lines[i][0] === "Message") {
+			records.push(messageText(lines[i][0], 16) + FIELD_SEPARATOR + messageText(lines[i][1], 32) + FIELD_SEPARATOR + messageText(lines[i][2], 16) + FIELD_SEPARATOR + messageText(lines[i][3], 160));
+		} else {
+			records.push(messageText(lines[i][0], 16) + FIELD_SEPARATOR + messageText(lines[i][1], 72));
+		}
 	}
 
 	sendToWatch({ THREAD_DETAIL: records.join(RECORD_SEPARATOR) });

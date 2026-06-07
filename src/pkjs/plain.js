@@ -66,6 +66,42 @@ const threadDetailQuery = `
               timelineEntries(filters: { isMessage: true }, last: 5) {
         edges {
           node {
+            timestamp {
+              iso8601
+            }
+            actor {
+              __typename
+              ... on CustomerActor {
+                customer {
+                  fullName
+                  email {
+                    email
+                  }
+                }
+              }
+              ... on UserActor {
+                user {
+                  fullName
+                  publicName
+                }
+                userId
+              }
+              ... on MachineUserActor {
+                machineUser {
+                  fullName
+                  publicName
+                }
+              }
+              ... on SystemActor {
+                workflow {
+                  name
+                }
+                systemId
+              }
+              ... on DeletedCustomerActor {
+                customerId
+              }
+            }
             entry {
               __typename
               ... on NoteEntry {
@@ -159,6 +195,44 @@ function shortDate(value) {
 	}
 
 	return String(value.iso8601).slice(0, 10);
+}
+
+function shortDateTime(value) {
+	if (value === null || value === undefined || value.iso8601 === undefined) {
+		return "";
+	}
+
+	return String(value.iso8601).slice(0, 16).replace("T", " ");
+}
+
+function actorText(actor) {
+	if (actor === null || actor === undefined) {
+		return "Unknown";
+	}
+
+	if (actor.customer) {
+		return compactText(actor.customer.fullName || (actor.customer.email ? actor.customer.email.email : "Customer"));
+	}
+	if (actor.user) {
+		return compactText(actor.user.fullName || actor.user.publicName || "User");
+	}
+	if (actor.machineUser) {
+		return compactText(actor.machineUser.fullName || actor.machineUser.publicName || "Machine user");
+	}
+	if (actor.workflow && actor.workflow.name) {
+		return compactText(actor.workflow.name);
+	}
+	if (actor.systemId) {
+		return compactText(actor.systemId);
+	}
+	if (actor.customerId) {
+		return "Deleted customer";
+	}
+	if (actor.userId) {
+		return compactText(actor.userId);
+	}
+
+	return compactText(actor.__typename || "Unknown");
 }
 
 function assigneeText(assignee) {
@@ -303,7 +377,11 @@ function fetchThreadDetail(apiKey, threadId, onDetail, onError) {
 		for (let i = 0; i < edges.length; i += 1) {
 			const text = entryText(edges[i].node.entry);
 			if (text !== "") {
-				messages.push(shorten(text, 80));
+				messages.push({
+					author: actorText(edges[i].node.actor),
+					sentAt: shortDateTime(edges[i].node.timestamp),
+					text: text,
+				});
 			}
 		}
 
