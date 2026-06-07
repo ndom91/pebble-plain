@@ -20,7 +20,7 @@
   "scripts": {
     "pebble:config": "BROWSER='open -a \"Google Chrome\" %s' pebble emu-app-config",
     "pebble:install-mobile": "pebble install --phone 10.0.1.34",
-    "pebble:dev": "pebble build && pebble install --emulator emery --logs"
+    "dev": "pebble build && pebble install --emulator emery --logs"
   },
   "pebble": {
     "displayName": "Plain",
