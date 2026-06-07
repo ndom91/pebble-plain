@@ -482,9 +482,11 @@ static void draw_messages_button_row(GContext *ctx, GRect row_frame, GRect conte
     graphics_context_set_text_color(ctx, GColorWhite);
   }
 
+  char label_text[24];
   GRect label_frame = GRect(content_frame.origin.x + 8, content_frame.origin.y + 6, content_frame.size.w - 38, content_frame.size.h - 6);
   GRect chevron_frame = GRect(content_frame.origin.x + content_frame.size.w - 30, content_frame.origin.y + 6, 22, content_frame.size.h - 6);
-  draw_text(ctx, "Messages", s_list_font, label_frame, GTextAlignmentLeft);
+  snprintf(label_text, sizeof(label_text), "Messages (%d)", s_message_count);
+  draw_text(ctx, label_text, s_list_font, label_frame, GTextAlignmentLeft);
   draw_text(ctx, ">", s_list_font, chevron_frame, GTextAlignmentRight);
 }
 
