@@ -29,6 +29,8 @@ Plain for Pebble shows your Plain TODO support threads on the watch, including t
 Requires a Plain machine-user API key. Configure the key from the Pebble/Rebble phone app settings page. The API key is stored on the phone by PebbleKit JS and is not sent to the watch.
 
 Supported watches: Pebble Time 2 and Pebble Round 2.
+
+Not affiliated with Plain.
 ```
 
 Release notes:
@@ -59,7 +61,7 @@ pebble install --emulator gabbro
 ## Publish Command
 
 The publish script reads the app name, version, and source URL from
-`package.json` and accepts screenshot paths as arguments:
+`package.json`:
 
 ```sh
 pebble login
@@ -70,6 +72,21 @@ Override dynamic values with environment variables if needed:
 
 ```sh
 APP_VERSION=1.0.4 RELEASE_NOTES="Bug fixes." ./scripts/publish.sh
+```
+
+For an existing app, `pebble publish` uploads a new release only. Listing
+metadata such as description, category, source URL, and icons is only used when
+creating a new app and must be changed later in the RePebble appstore dashboard:
+`https://appstore-api.repebble.com/dashboard`.
+
+Screenshot uploads are disabled by default because release uploads append
+screenshots to the listing and can create duplicates. Only upload screenshots
+for a new app, or when intentionally adding screenshots. With no screenshot
+paths, `UPLOAD_SCREENSHOTS=1` uploads PNG and GIF files from `assets/screenshots/`:
+
+```sh
+UPLOAD_SCREENSHOTS=1 ./scripts/publish.sh
+UPLOAD_SCREENSHOTS=1 ./scripts/publish.sh assets/screenshots/emery_thread-list.png
 ```
 
 Interactive upload without the script:
@@ -91,7 +108,6 @@ pebble publish --non-interactive \
   --source "<public-repository-url>" \
   --icon-small assets/store-icon-small.png \
   --icon-large assets/store-icon-large.png \
-  --screenshots "<emery_screenshot.png>" \
   --release-notes "Improves watch navigation with wraparound list movement and direct previous/next navigation between message detail pages."
 ```
 
