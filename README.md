@@ -67,4 +67,6 @@ wscript                        Build rules — usually no need to edit
 
 ## License
 
+Not affiliated with Plain
+
 MIT

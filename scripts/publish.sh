@@ -8,7 +8,7 @@ read_package_json() {
 
 APP_NAME="${APP_NAME:-$(read_package_json "p.pebble.displayName")}"
 APP_VERSION="${APP_VERSION:-$(read_package_json "p.version")}"
-APP_DESCRIPTION="${APP_DESCRIPTION:-Plain for Pebble shows your Plain support threads on the watch, including thread references, titles, customer metadata, labels, assignees, and recent messages. Requires a Plain machine-user API key configured from the Pebble/Rebble phone app. The API key is stored on the phone and is not sent to the watch.}"
+APP_DESCRIPTION="${APP_DESCRIPTION:-Plain for Pebble shows your Plain support threads on the watch, including thread references, titles, customer metadata, labels, assignees, and recent messages. Requires a Plain machine-user API key configured from the Pebble/Rebble phone app. The API key is stored on the phone and is not sent to the watch. Not affiliated with Plain.}"
 APP_CATEGORY="${APP_CATEGORY:-tools}"
 SOURCE_URL="${SOURCE_URL:-$(read_package_json "p.repository && p.repository.url || ''")}"
 RELEASE_NOTES="${RELEASE_NOTES:-Improves watch navigation with wraparound list movement and direct previous/next navigation between message detail pages.}"
@@ -54,5 +54,6 @@ pebble publish --non-interactive \
   --source "$SOURCE_URL" \
   --icon-small assets/store-icon-small.png \
   --icon-large assets/store-icon-large.png \
-  --screenshots "${screenshots[@]}" \
   --release-notes "$RELEASE_NOTES"
+
+# --screenshots "${screenshots[@]}" \
