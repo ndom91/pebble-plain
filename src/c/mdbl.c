@@ -287,6 +287,52 @@ static void clamp_message_selection(void) {
   }
 }
 
+static void move_list_selection(int delta) {
+  if (s_thread_count == 0) {
+    return;
+  }
+
+  s_selected_index += delta;
+  if (s_selected_index < 0) {
+    s_selected_index = s_thread_count - 1;
+  } else if (s_selected_index >= s_thread_count) {
+    s_selected_index = 0;
+  }
+
+  clamp_list_selection();
+}
+
+static void move_detail_selection(int delta) {
+  int rows = detail_row_count();
+  if (rows == 0) {
+    return;
+  }
+
+  s_detail_selected_index += delta;
+  if (s_detail_selected_index < 0) {
+    s_detail_selected_index = rows - 1;
+  } else if (s_detail_selected_index >= rows) {
+    s_detail_selected_index = 0;
+  }
+
+  clamp_detail_selection();
+}
+
+static void move_message_selection(int delta) {
+  if (s_message_count == 0) {
+    return;
+  }
+
+  s_message_selected_index += delta;
+  if (s_message_selected_index < 0) {
+    s_message_selected_index = s_message_count - 1;
+  } else if (s_message_selected_index >= s_message_count) {
+    s_message_selected_index = 0;
+  }
+
+  clamp_message_selection();
+}
+
 static void render_error(const char *message) {
   s_view = ViewList;
   s_pending_thread_index[0] = '\0';
@@ -608,16 +654,13 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
 
 static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (s_view == ViewMessageDetail) {
-    return;
+    move_message_selection(-1);
   } else if (s_view == ViewDetail) {
-    s_detail_selected_index -= 1;
-    clamp_detail_selection();
+    move_detail_selection(-1);
   } else if (s_view == ViewMessages) {
-    s_message_selected_index -= 1;
-    clamp_message_selection();
+    move_message_selection(-1);
   } else {
-    s_selected_index -= 1;
-    clamp_list_selection();
+    move_list_selection(-1);
   }
   reset_marquee();
   mark_dirty();
@@ -625,16 +668,13 @@ static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
 
 static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (s_view == ViewMessageDetail) {
-    return;
+    move_message_selection(1);
   } else if (s_view == ViewDetail) {
-    s_detail_selected_index += 1;
-    clamp_detail_selection();
+    move_detail_selection(1);
   } else if (s_view == ViewMessages) {
-    s_message_selected_index += 1;
-    clamp_message_selection();
+    move_message_selection(1);
   } else {
-    s_selected_index += 1;
-    clamp_list_selection();
+    move_list_selection(1);
   }
   reset_marquee();
   mark_dirty();
