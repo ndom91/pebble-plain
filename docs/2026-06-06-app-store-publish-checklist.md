@@ -92,7 +92,7 @@ pebble publish --non-interactive \
   --icon-small assets/store-icon-small.png \
   --icon-large assets/store-icon-large.png \
   --screenshots "<emery_screenshot.png>" \
-  --release-notes "Adds selectable message detail pages with author, sent time, and full message text."
+  --release-notes "Improves watch navigation with wraparound list movement and direct previous/next navigation between message detail pages."
 ```
 
 Use `--is-published` only when the listing should become visible immediately.

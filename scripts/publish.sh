@@ -11,7 +11,7 @@ APP_VERSION="${APP_VERSION:-$(read_package_json "p.version")}"
 APP_DESCRIPTION="${APP_DESCRIPTION:-Plain for Pebble shows your Plain support threads on the watch, including thread references, titles, customer metadata, labels, assignees, and recent messages. Requires a Plain machine-user API key configured from the Pebble/Rebble phone app. The API key is stored on the phone and is not sent to the watch.}"
 APP_CATEGORY="${APP_CATEGORY:-tools}"
 SOURCE_URL="${SOURCE_URL:-$(read_package_json "p.repository && p.repository.url || ''")}"
-RELEASE_NOTES="${RELEASE_NOTES:-Adds selectable message detail pages with author, sent time, and full message text.}"
+RELEASE_NOTES="${RELEASE_NOTES:-Improves watch navigation with wraparound list movement and direct previous/next navigation between message detail pages.}"
 
 if [ -z "$SOURCE_URL" ]; then
   printf 'SOURCE_URL is required, for example:\n  SOURCE_URL=https://github.com/<owner>/<repo> %s screenshots/emery.png\n' "$0" >&2
